@@ -65,6 +65,22 @@ export function buildDay(day: string, fresh: Card[], prev: DayFeed | null | unde
 }
 
 /**
+ * Adds carry-overs a day is missing. The Mac may build tomorrow the night before,
+ * before today's last lessons were opened, so the phone tops it up when the day starts.
+ */
+export function addCarryOvers(feed: DayFeed, prev: DayFeed | null | undefined): DayFeed {
+  const have = new Set(feed.cards.map((c) => c.id));
+  const missing = [...carryOverCards(prev), ...watchFollowUps(prev)].filter((c) => !have.has(c.id));
+  if (!missing.length) return feed;
+  const cards = [...feed.cards];
+  for (const c of missing) {
+    const at = cards.findIndex((x) => x.kind === c.kind);
+    cards.splice(at >= 0 ? at : cards.length, 0, { ...c, updatedAt: new Date().toISOString() });
+  }
+  return { ...feed, cards };
+}
+
+/**
  * Returns today's feed without rebuilding it if it already exists (idempotent).
  * `force` is the "Rebuild today's feed" button: it re-runs the build but keeps
  * the status, chat and opened state of any card that survives.

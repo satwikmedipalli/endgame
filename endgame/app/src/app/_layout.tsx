@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '@/store/AuthProvider';
 import { FeedProvider } from '@/store/FeedStore';
+import { HelperProvider } from '@/store/Helper';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 
 SplashScreen.preventAutoHideAsync();
@@ -60,7 +61,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <FeedProvider>
-            <Shell />
+            <HelperProvider>
+              <Shell />
+            </HelperProvider>
           </FeedProvider>
         </AuthProvider>
       </ThemeProvider>

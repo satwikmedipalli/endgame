@@ -10,8 +10,8 @@ Personal, single-user app. No ads, no infinite scroll, no paid API: all AI work 
 |---|---|---|
 | 1 | App with dummy data: feed, DONE/Skip, carry-over, lesson screen, done screen, auto theme, tests | ✅ |
 | 2 | Supabase: tables, login, row-level security, local-first sync | ✅ |
-| 3 | Mac worker + Sync + news pipeline + in-app chat | next |
-| 4 | Lesson engine (syllabi, course memory), coding + stocks | |
+| 3 | Mac worker + Sync + news pipeline + in-app chat | ✅ |
+| 4 | Lesson engine (syllabi, course memory), coding + stocks | next |
 | 5 | History + watch recommendations, taste profile | |
 | 6 | Chess (chess.js, Chess.com games, Stockfish Action) | |
 | 7 | Italian (spaced repetition, pronunciation) | |
@@ -25,10 +25,11 @@ app/       Expo app (iPhone + review website)
   src/app/         screens: feed, card/[id], progress, settings
   src/components/  feed card, header, lesson blocks, chess board, done screen
   src/lib/         pure logic + tests (feed rules, sun/theme, block validation)
-  src/store/       on-device store (Supabase replaces it in milestone 2)
+  src/store/       local-first feed store, Supabase sync, auth, Mac helper link
   src/data/        sample day used until Sync exists
+worker/    Mac helper: Sync (news pipeline), chat replies, via `claude -p` on the Max plan
 design/    the approved design canvas files, for reference
-supabase/  database migrations, auth config, email template
+supabase/  database migrations, auth config
 DECISIONS.md
 ```
 
@@ -82,8 +83,28 @@ npx expo lint
 
 The free project pauses after 7 days without use; restore it from the dashboard with one click.
 
+## Mac helper (worker)
+
+Runs in the background on the Mac, signs in as you (so row-level security applies), and does the jobs the app asks for. Claude runs through `claude -p` on the Max plan; `ANTHROPIC_API_KEY` is stripped so it can never bill the API.
+
+```bash
+cd ~/endgame/endgame/worker
+npm install
+cp .env.example .env        # Supabase URL + publishable key + your email and password
+npm run sync                # one Sync now (today before 5 PM Chicago, else tomorrow)
+./install.sh                # background service (launchd), starts at login, restarts if it dies
+./uninstall.sh              # remove it
+tail -f logs/helper.log
+npm test && npm run typecheck
+```
+
+- **Sync**: 22 RSS feeds → dedupe clusters → Haiku triage (merge duplicates, region, category, importance, drop opinion) → pick 13 US, 13 India, 12 world → Sonnet writes each card from the sources only. About 90 s. Lessons are still the sample ones until milestone 4.
+- **Re-running Sync** on a started day keeps every card you touched (done, skipped, opened or chatted) and replaces the rest.
+- **Chat**: the app writes your question and a `chat` job; the helper answers with Sonnet using the card's content and history, and the reply arrives through Realtime (a few seconds). Mac off → the question is saved and the app says so.
+- The app shows "Mac connected" when the helper's heartbeat (every 30 s) is under 90 s old.
+
 ## Secrets
 
 - `app/.env.local` holds the Supabase URL and publishable key. It's git-ignored. The publishable key is designed to ship in apps; row-level security is what protects the data.
-- The secret / service-role key never goes in the app or in git. The Mac helper (milestone 3) will keep its own in a git-ignored file.
+- The secret / service-role key never goes in the app or in git. The Mac helper doesn't need it: it logs in as you with the publishable key, from `worker/.env` (git-ignored, chmod 600).
 - There is no Anthropic API key anywhere, by design.

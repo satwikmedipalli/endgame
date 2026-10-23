@@ -52,4 +52,6 @@ export interface DayFeed {
   day: string;
   builtAt: string;
   cards: Card[];
+  /** 'sync' = built by the Mac's Sync; 'app' = the phone's fallback. A Sync day replaces a fallback day. */
+  source?: 'app' | 'sync';
 }

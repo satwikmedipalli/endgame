@@ -2,11 +2,18 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
-import { progress } from '@/lib/feed';
+import { dayKey, progress } from '@/lib/feed';
+import { supabase } from '@/lib/supabase';
 import type { DayFeed } from '@/lib/types';
 import { useTheme } from '@/theme/ThemeProvider';
 import { accent, fonts } from '@/theme/tokens';
+import { SyncControl } from './SyncControl';
 import { Dot, OutlineButton, Serif, T } from './ui';
+
+function tomorrow() {
+  const [y, m, d] = dayKey(new Date()).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+}
 
 /** "You're done for today." The king topples once the last card is cleared. */
 export function DoneOverlay({ feed, onLookBack }: { feed: DayFeed; onLookBack: () => void }) {
@@ -62,6 +69,7 @@ export function DoneOverlay({ feed, onLookBack }: { feed: DayFeed; onLookBack: (
         </T>
         <OutlineButton label="Look back" height={44} size={13} onPress={onLookBack} style={{ borderRadius: 12 }} />
       </View>
+      {supabase && <SyncControl day={tomorrow()} label="Prepare tomorrow" />}
     </Animated.View>
   );
 }

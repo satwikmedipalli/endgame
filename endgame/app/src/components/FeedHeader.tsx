@@ -1,6 +1,10 @@
 import { Link } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
+import { supabase } from '@/lib/supabase';
+import { useHelper } from '@/store/Helper';
+import { useSyncLabel } from './SyncControl';
+
 import { HOME } from '@/lib/sun';
 import type { DayFeed } from '@/lib/types';
 import { progress } from '@/lib/feed';
@@ -27,6 +31,10 @@ export function FeedHeader({ feed, current }: { feed: DayFeed; current: number }
     date = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: HOME.tz });
   } catch {}
   const gap = total > 24 ? 2 : 4;
+  const { requestSync } = useHelper();
+  const sync = useSyncLabel();
+  // Until the Mac has built today, the news is placeholder: offer a Sync instead of the theme hint.
+  const notSynced = !!supabase && feed.source !== 'sync';
 
   return (
     <View style={{ height: HEADER_H, paddingTop: 14, paddingLeft: 16, paddingRight: 10, gap: 8, zIndex: 300 }}>
@@ -76,9 +84,21 @@ export function FeedHeader({ feed, current }: { feed: DayFeed; current: number }
           {cleared} / {total} cleared
         </T>
       </View>
-      <T size={11} color={t.faint}>
-        {label}
-      </T>
+      {sync.running ? (
+        <T size={11} color={t.faint} numberOfLines={1}>
+          {sync.text}
+        </T>
+      ) : notSynced ? (
+        <Pressable accessibilityRole="button" onPress={() => requestSync()} hitSlop={8}>
+          <T size={11} color={t.muted} numberOfLines={1}>
+            Sample news · {sync.online ? 'tap to Sync real news' : 'Sync when your Mac is on'}
+          </T>
+        </Pressable>
+      ) : (
+        <T size={11} color={t.faint}>
+          {label}
+        </T>
+      )}
     </View>
   );
 }

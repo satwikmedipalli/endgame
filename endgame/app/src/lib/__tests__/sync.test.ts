@@ -107,3 +107,20 @@ describe('changedRows', () => {
     expect(S.changedRows(rows, {}).cards).toHaveLength(1);
   });
 });
+
+describe('Sync-built days', () => {
+  it('a Sync day replaces the phone fallback, keeping status of shared cards', () => {
+    const local = { d: { ...day('d', [c('news-sample'), c('code-1', { status: 'done', updatedAt: '2026-10-22T12:00:00.000Z' })]), source: 'app' as const } };
+    const remote = { d: { ...day('d', [c('news-real'), c('code-1', { updatedAt: '2026-10-22T11:00:00.000Z' })], '2026-10-22T05:00:00.000Z'), source: 'sync' as const } };
+    const m = S.mergeFeeds(local, remote).d;
+    expect(m.source).toBe('sync');
+    expect(m.cards.map((x) => x.id)).toEqual(['news-real', 'code-1']);
+    expect(m.cards[1].status).toBe('done');
+  });
+
+  it('source survives the round trip', () => {
+    const rows = S.toRows({ '2026-10-22': { ...day('2026-10-22', [c('a')]), source: 'sync' } }, 'u1');
+    expect(rows.days[0].source).toBe('sync');
+    expect(S.fromRows(rows)['2026-10-22'].source).toBe('sync');
+  });
+});

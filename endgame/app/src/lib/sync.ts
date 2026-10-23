@@ -1,7 +1,7 @@
 // Pure mapping and merge logic between the on-device feeds and Supabase rows.
 import type { Card, ChatMessage, DayFeed } from './types';
 
-export type DayRow = { user_id: string; day: string; built_at: string };
+export type DayRow = { user_id: string; day: string; built_at: string; source: 'app' | 'sync' };
 export type CardRow = {
   user_id: string;
   day: string;
@@ -25,7 +25,7 @@ export function toRows(feeds: Record<string, DayFeed>, userId: string): Rows {
   const cards: CardRow[] = [];
   const chats = new Map<string, ChatRow>();
   for (const f of Object.values(feeds)) {
-    days.push({ user_id: userId, day: f.day, built_at: f.builtAt });
+    days.push({ user_id: userId, day: f.day, built_at: f.builtAt, source: f.source ?? 'app' });
     f.cards.forEach((c, position) => {
       cards.push({
         user_id: userId,
@@ -51,7 +51,11 @@ export function toRows(feeds: Record<string, DayFeed>, userId: string): Rows {
 }
 
 // Postgres returns "+00:00" timestamps; JS writes "Z". Normalise so comparisons work.
-const iso = (t: string | null | undefined) => (t ? new Date(t).toISOString() : undefined);
+const iso = (t: string | null | undefined) => {
+  if (!t) return undefined;
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? t : d.toISOString();
+};
 
 export function fromRows(rows: Rows): Record<string, DayFeed> {
   const chatBy = new Map<string, ChatMessage[]>();
@@ -61,7 +65,7 @@ export function fromRows(rows: Rows): Record<string, DayFeed> {
     chatBy.set(m.card_id, list);
   }
   const feeds: Record<string, DayFeed> = {};
-  for (const d of rows.days) feeds[d.day] = { day: d.day, builtAt: iso(d.built_at)!, cards: [] };
+  for (const d of rows.days) feeds[d.day] = { day: d.day, builtAt: iso(d.built_at)!, cards: [], source: d.source ?? 'app' };
   for (const r of [...rows.cards].sort((a, b) => a.position - b.position)) {
     const f = feeds[r.day];
     if (!f) continue;
@@ -102,7 +106,10 @@ export function mergeFeeds(local: Record<string, DayFeed>, remote: Record<string
       out[day] = r;
       continue;
     }
-    const [lead, other] = newer(r.builtAt, l.builtAt) ? [r, l] : [l, r];
+    // A Sync-built day replaces the phone's fallback outright (its placeholder cards go);
+    // otherwise the later build leads and cards from both sides survive.
+    const syncWins = (r.source === 'sync') !== (l.source === 'sync');
+    const [lead, other] = syncWins ? (r.source === 'sync' ? [r, l] : [l, r]) : newer(r.builtAt, l.builtAt) ? [r, l] : [l, r];
     const otherById = new Map(other.cards.map((c) => [c.id, c]));
     const cards = lead.cards.map((c) => {
       const o = otherById.get(c.id);
@@ -111,7 +118,7 @@ export function mergeFeeds(local: Record<string, DayFeed>, remote: Record<string
       const win = newer(c.updatedAt, o.updatedAt) ? c : o;
       return { ...win, chat: mergeChat(c.chat, o.chat) };
     });
-    out[day] = { ...lead, cards: [...cards, ...otherById.values()] };
+    out[day] = { ...lead, cards: syncWins ? cards : [...cards, ...otherById.values()] };
   }
   return out;
 }

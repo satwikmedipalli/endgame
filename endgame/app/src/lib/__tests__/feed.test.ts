@@ -167,3 +167,13 @@ describe('streak', () => {
     expect(F.prevDay('2026-01-01')).toBe('2025-12-31');
   });
 });
+
+describe('addCarryOvers', () => {
+  it('tops up a day built the night before, once', () => {
+    const prev = day('2026-10-22', [c('code-1', 'code', { openedAt: 'x' })]);
+    const built = day('2026-10-23', [c('news-1', 'news'), c('code-2', 'code')]);
+    const once = F.addCarryOvers(built, prev);
+    expect(once.cards.map((x) => x.id)).toEqual(['news-1', 'code-1', 'code-2']);
+    expect(F.addCarryOvers(once, prev)).toBe(once);
+  });
+});

@@ -1,5 +1,5 @@
 // Dummy content for milestone 1. Sync replaces all of this from milestone 3 on.
-import type { Block, Card, DayFeed } from '@/lib/types';
+import type { Block, Card, DayFeed } from '../lib/types';
 
 type Draft = Omit<Card, 'status' | 'chat'> & Partial<Pick<Card, 'status' | 'chat'>>;
 const card = (d: Draft): Card => ({ status: 'open', chat: [], ...d });

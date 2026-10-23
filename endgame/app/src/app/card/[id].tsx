@@ -7,13 +7,11 @@ import { BlockView } from '@/components/Blocks';
 import { Icon } from '@/components/Icon';
 import { DoneButton, OutlineButton, Serif, T } from '@/components/ui';
 import type { Card } from '@/lib/types';
-import { requestAdvance } from '@/store/nav';
 import { useFeed } from '@/store/FeedStore';
+import { useHelper } from '@/store/Helper';
+import { requestAdvance } from '@/store/nav';
 import { useTheme } from '@/theme/ThemeProvider';
 import { accent, fonts, KIND_LABEL } from '@/theme/tokens';
-
-// Milestone 3 connects this to the Mac helper. Until then chat is stored but not answered.
-const MAC_CONNECTED = false;
 
 function WatchFlow({ card }: { card: Card }) {
   const { t, mode } = useTheme();
@@ -101,17 +99,15 @@ function WatchFlow({ card }: { card: Card }) {
 
 function Chat({ card }: { card: Card }) {
   const { t, mode } = useTheme();
-  const { addChat } = useFeed();
+  const { ask, thinking } = useHelper();
   const a = accent(card.kind, mode);
   const [text, setText] = useState('');
+  const waiting = thinking.has(card.id);
 
   const send = (msg: string) => {
     const m = msg.trim();
-    if (!m) return;
-    addChat(card.id, { role: 'user', text: m });
-    if (!MAC_CONNECTED) {
-      addChat(card.id, { role: 'system', text: 'Saved. The Mac helper is not connected yet, so this will be answered once it is.' });
-    }
+    if (!m || waiting) return;
+    ask(card.id, m);
     setText('');
   };
 
@@ -137,6 +133,13 @@ function Chat({ card }: { card: Card }) {
             </T>
           </View>
         ),
+      )}
+      {waiting && (
+        <View style={{ alignSelf: 'flex-start', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 18, borderBottomLeftRadius: 6, backgroundColor: t.card, borderWidth: 1, borderColor: t.cardLine }}>
+          <T size={15} color={t.muted}>
+            Thinking on your Mac…
+          </T>
+        </View>
       )}
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
         {['Simplify', 'Another example'].map((chip) => (
@@ -172,6 +175,7 @@ export default function CardScreen() {
   const { t, mode } = useTheme();
   const insets = useSafeAreaInsets();
   const { today, mark, opened } = useFeed();
+  const { online } = useHelper();
   const [readPct, setReadPct] = useState(0);
   const card = today?.cards.find((c) => c.id === id);
 
@@ -204,9 +208,9 @@ export default function CardScreen() {
           <Icon name="back" size={18} color={t.text} stroke={1.9} />
         </Pressable>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: t.card, borderWidth: 1, borderColor: t.cardLine }}>
-          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: MAC_CONNECTED ? t.ok : t.faint }} />
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: online ? t.ok : t.faint }} />
           <T size={12} color={t.muted}>
-            {MAC_CONNECTED ? 'Mac connected' : 'Mac offline'}
+            {online ? 'Mac connected' : 'Mac offline'}
           </T>
         </View>
       </View>

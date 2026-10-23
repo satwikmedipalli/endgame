@@ -39,3 +39,13 @@ Short log of choices and why. Newest at the bottom of each section.
 - **Tables for later milestones are created now** (`courses`, `seen`, `ratings`, `jobs`) so the schema is reviewed once. `jobs` and `chat_messages` are in the Realtime publication for the Mac helper.
 - **Without `.env.local` the app runs on-device only**, so the review website still works without an account.
 - **Reset to sample day also deletes the server copy**, otherwise the next merge would restore it.
+
+## Milestone 3 (Mac helper, Sync, news, chat)
+
+- **The helper logs in as you instead of using the service-role key.** Same row-level security as the phone, and no all-powerful key on disk. The password sits in `worker/.env` (git-ignored, chmod 600).
+- **Jobs go through the `jobs` table.** The app inserts; the helper hears it over Realtime and also polls every 20 s (Realtime misses events while the Mac sleeps). A job is claimed with `update … where status = 'queued'`, so it runs once. Jobs run one at a time, chat before Sync.
+- **Sync targets today before 5 PM Chicago, tomorrow after**, so the evening "Prepare tomorrow" button builds the next day.
+- **A Sync-built day replaces the phone's fallback day** (`days.source = 'sync'`), keeping status on cards both share. A re-run keeps whatever you touched.
+- **News: Haiku triages, Sonnet writes.** Word-overlap clustering catches most duplicates cheaply; Haiku then merges the rest, fixes regions (a BBC story about India is India) and ranks importance. Sonnet writes only from the source summaries, says "Still unclear" when sources disagree, and lists who covered it. Stories too close to yesterday's are dropped.
+- **Gotcha: `[auth.email] enable_signup = false` turns off email login entirely**, not just signups. Signups are closed with `[auth] enable_signup = false` plus the database trigger; the email provider must stay on.
+

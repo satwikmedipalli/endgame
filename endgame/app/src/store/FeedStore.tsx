@@ -30,11 +30,14 @@ type Store = {
   opened: (id: string) => void;
   patch: (id: string, patch: Partial<Card>) => void;
   addChat: (id: string, msg: Omit<ChatMessage, 'at' | 'id'>) => void;
+  /** Adds a full message to every day that has this card; ignores ids already present. */
+  appendChat: (cardId: string, msg: ChatMessage) => void;
   autoSkipBefore: (index: number) => void;
   clearNews: () => void;
   rebuild: () => void;
   resetAll: () => Promise<void>;
   syncNow: () => void;
+  userId: string | null;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -57,7 +60,10 @@ function withToday(feeds: Record<string, DayFeed>, today: string) {
     const y = F.prevDay(today);
     next = { [y]: seedYesterday(y) };
   }
-  return next[today] ? next : { ...next, [today]: F.ensureDay(next, today, freshCards(today)) };
+  if (!next[today]) return { ...next, [today]: F.ensureDay(next, today, freshCards(today)) };
+  const prev = Object.keys(next).filter((d) => d < today).sort().pop();
+  const topped = F.addCarryOvers(next[today], prev ? next[prev] : null);
+  return topped === next[today] ? next : { ...next, [today]: topped };
 }
 
 async function pull(cutoff: string): Promise<S.Rows> {
@@ -205,6 +211,22 @@ export function FeedProvider({ children }: { children: ReactNode }) {
           const c = f.cards.find((x) => x.id === id);
           return c ? F.patchCard(f, id, { chat: [...c.chat, { ...msg, id: randomUUID(), at: new Date().toISOString() }] }) : f;
         }),
+      appendChat: (cardId, msg) =>
+        setFeeds((all) => {
+          let changed = false;
+          const next: Record<string, DayFeed> = {};
+          for (const [d, f] of Object.entries(all)) {
+            const c = f.cards.find((x) => x.id === cardId);
+            if (!c || c.chat.some((m) => m.id === msg.id)) {
+              next[d] = f;
+              continue;
+            }
+            changed = true;
+            const chat = [...c.chat, msg].sort((a, b) => a.at.localeCompare(b.at));
+            next[d] = { ...f, cards: f.cards.map((x) => (x.id === cardId ? { ...x, chat } : x)) };
+          }
+          return changed ? next : all;
+        }),
       autoSkipBefore: (i) => edit((f) => F.autoSkipNewsBefore(f, i)),
       clearNews: () => edit(F.clearAllNews),
       rebuild: () => setFeeds((f) => ({ ...f, [day]: F.ensureDay(f, day, freshCards(day), { force: true }) })),
@@ -221,6 +243,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       syncNow: () => {
         pullAndMerge().then(pushNow);
       },
+      userId,
     }),
     [ready, feeds, day, sync, edit, userId, pullAndMerge, pushNow],
   );

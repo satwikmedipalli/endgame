@@ -3,10 +3,12 @@ import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { SyncControl } from '@/components/SyncControl';
 import { OutlineButton, T } from '@/components/ui';
 import type { ThemePref } from '@/lib/sun';
 import { useAuth } from '@/store/AuthProvider';
 import { useFeed } from '@/store/FeedStore';
+import { useHelper } from '@/store/Helper';
 import { useTheme } from '@/theme/ThemeProvider';
 
 function confirm(title: string, body: string, onYes: () => void) {
@@ -25,6 +27,8 @@ export default function Settings() {
   const insets = useSafeAreaInsets();
   const { rebuild, resetAll, sync, syncNow } = useFeed();
   const auth = useAuth();
+  const helper = useHelper();
+  const seen = helper.lastSeen ? new Date(helper.lastSeen).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : null;
   const syncLabel =
     sync.status === 'local'
       ? 'On this device only'
@@ -118,14 +122,15 @@ export default function Settings() {
             Mac helper
           </T>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: t.faint }} />
+            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: helper.online ? t.ok : t.faint }} />
             <T size={14} color={t.muted}>
-              Not connected (arrives in milestone 3)
+              {helper.online ? `Connected${helper.busy ? ` · ${helper.busy}` : ''}` : seen ? `Offline · last seen ${seen}` : 'Not set up yet'}
             </T>
           </View>
           <T size={12} color={t.faint} style={{ lineHeight: 18 }}>
-            Sync on the Mac writes tomorrow&apos;s cards with your Claude Max plan. No API keys are used anywhere.
+            Sync pulls the news and writes every card with your Claude Max plan (no API keys). Before 5 PM it builds today; after, tomorrow.
           </T>
+          {auth.session && <SyncControl />}
         </View>
 
         <View style={panel}>
