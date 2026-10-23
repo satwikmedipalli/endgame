@@ -1,0 +1,44 @@
+# Weekly chess analysis: imports your Chess.com games, runs Stockfish over the recent
+# ones and saves the report the chess course is built from. No Claude involved.
+# Secrets (Settings → Secrets and variables → Actions): SUPABASE_URL, SUPABASE_KEY
+# (the publishable key), ENDGAME_EMAIL, ENDGAME_PASSWORD. It signs in as you, so
+# row-level security applies exactly as on the phone.
+name: Weekly chess analysis
+
+on:
+  schedule:
+    - cron: '0 10 * * 1' # Mondays 10:00 UTC (5 AM Chicago in summer, 4 AM in winter)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: endgame/worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: endgame/worker/package-lock.json
+      - name: Install Stockfish 19
+        run: |
+          curl -fsSL -o /tmp/sf.tgz https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-x86-64-universal.tar.gz
+          mkdir -p /tmp/sf && tar xzf /tmp/sf.tgz -C /tmp/sf
+          bin=$(find /tmp/sf -type f -name 'stockfish*' -perm -u+x | head -1)
+          printf 'uci\nquit\n' | "$bin" | grep '^id name'
+          echo "STOCKFISH_BIN=$bin" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run chess-analysis
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ENDGAME_EMAIL: ${{ secrets.ENDGAME_EMAIL }}
+          ENDGAME_PASSWORD: ${{ secrets.ENDGAME_PASSWORD }}
+          CHESS_THREADS: 4

@@ -72,6 +72,11 @@ describe('watch follow-up', () => {
     expect(ups[0].id).toBe('watch-a-followup');
     expect(ups[0].watch?.stage).toBe('followup');
   });
+
+  it('asks "Did you read it?" for a book', () => {
+    const prev = day('2026-10-21', [c('watch-book-dune', 'watch', { title: 'Dune', tag: 'Book · 1965', watch: { stage: 'decided', willWatch: true } })]);
+    expect(F.watchFollowUps(prev)[0].title).toBe('Did you read Dune?');
+  });
 });
 
 describe('ensureDay', () => {
@@ -175,5 +180,13 @@ describe('addCarryOvers', () => {
     const once = F.addCarryOvers(built, prev);
     expect(once.cards.map((x) => x.id)).toEqual(['news-1', 'code-1', 'code-2']);
     expect(F.addCarryOvers(once, prev)).toBe(once);
+  });
+
+  it('drops an untouched lesson you finished after the next day was built', () => {
+    const prev = day('2026-10-22', [c('code-1-02', 'code', { status: 'done', openedAt: 'x' })]);
+    const built = day('2026-10-23', [c('code-1-02', 'code'), c('code-1-03', 'code')]);
+    expect(F.addCarryOvers(built, prev).cards.map((x) => x.id)).toEqual(['code-1-03']);
+    const opened = day('2026-10-23', [c('code-1-02', 'code', { openedAt: 'y' })]);
+    expect(F.addCarryOvers(opened, prev)).toBe(opened);
   });
 });

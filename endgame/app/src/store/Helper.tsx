@@ -2,14 +2,25 @@ import { randomUUID } from 'expo-crypto';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { supabase } from '@/lib/supabase';
+import { isLessonCourse } from '@/lib/course';
 import { toRows } from '@/lib/sync';
-import type { ChatMessage } from '@/lib/types';
+import type { ChatMessage, DayFeed } from '@/lib/types';
 import { useFeed } from './FeedStore';
 
 // Talks to the Mac helper through Supabase: its heartbeat, Sync jobs and chat jobs.
 const ONLINE_WITHIN_MS = 90_000;
 
 export type SyncJob = { id: string; status: 'queued' | 'running' | 'done' | 'failed'; stage?: string; error?: string; day?: string };
+export type LessonJob = { id: string; status: SyncJob['status']; error?: string };
+
+/** Upserts one card (and its day) so the Mac reads the latest version, without waiting for the background push. */
+async function pushCard(today: DayFeed, cardId: string, userId: string) {
+  const rows = toRows({ [today.day]: today }, userId);
+  const d = await supabase!.from('days').upsert(rows.days);
+  if (d.error) throw d.error;
+  const c = await supabase!.from('cards').upsert(rows.cards.filter((r) => r.id === cardId));
+  if (c.error) throw c.error;
+}
 
 type Helper = {
   /** The Mac helper sent a heartbeat in the last 90 seconds. */
@@ -21,6 +32,10 @@ type Helper = {
   ask: (cardId: string, text: string) => Promise<void>;
   /** Card ids waiting for a reply. */
   thinking: Set<string>;
+  /** Asks the Mac to write a lesson (Explain). Queued if the Mac is off. */
+  explain: (cardId: string) => Promise<void>;
+  /** Lesson jobs by card id. */
+  lessons: Record<string, LessonJob>;
 };
 
 const Ctx = createContext<Helper | null>(null);
@@ -32,6 +47,8 @@ export function HelperProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => Date.now());
   const [job, setJob] = useState<SyncJob | null>(null);
   const [thinking, setThinking] = useState<Set<string>>(new Set());
+  const [lessons, setLessons] = useState<Record<string, LessonJob>>({});
+  const lessonJobs = useRef(new Map<string, string>()); // job id → card id
   const chatJobs = useRef(new Map<string, string>()); // job id → card id
   const todayRef = useRef(feed.today);
   // The store's functions change on every edit; keep the realtime channel stable.
@@ -63,6 +80,15 @@ export function HelperProvider({ children }: { children: ReactNode }) {
       .select('last_seen, busy')
       .maybeSingle()
       .then(({ data }) => data && setStatus(data));
+    // A lesson still being written when the app was closed.
+    sb.from('jobs')
+      .select('id, status, payload')
+      .eq('type', 'lesson')
+      .in('status', ['queued', 'running'])
+      .then(({ data }) => {
+        for (const j of data ?? []) lessonJobs.current.set(j.id, j.payload.card_id);
+        if (data?.length) setLessons((l) => ({ ...l, ...Object.fromEntries(data.map((j) => [j.payload.card_id, { id: j.id, status: j.status }])) }));
+      });
 
     const ch = sb
       .channel(`endgame-${userId}`)
@@ -79,6 +105,11 @@ export function HelperProvider({ children }: { children: ReactNode }) {
         const r = p.new as { id: string; type: string; status: SyncJob['status']; result?: { stage?: string; day?: string }; error?: string };
         if (r.type === 'sync') {
           setJob((j) => (j && j.id === r.id ? { ...j, status: r.status, stage: r.result?.stage ?? j.stage, error: r.error, day: r.result?.day ?? j.day } : j));
+          if (r.status === 'done') fns.current.syncNow();
+        }
+        if (r.type === 'lesson') {
+          const cardId = lessonJobs.current.get(r.id);
+          if (cardId) setLessons((l) => ({ ...l, [cardId]: { id: r.id, status: r.status, error: r.error } }));
           if (r.status === 'done') fns.current.syncNow();
         }
         if (r.type === 'chat' && r.status === 'failed') {
@@ -149,9 +180,45 @@ export function HelperProvider({ children }: { children: ReactNode }) {
     [userId, online, appendChat, stopThinking],
   );
 
+  const explain = useCallback(
+    async (cardId: string) => {
+      const today = todayRef.current;
+      if (!supabase || !userId || !today) return;
+      setLessons((l) => ({ ...l, [cardId]: { id: '', status: 'queued' } }));
+      try {
+        await pushCard(today, cardId, userId);
+        const j = await supabase.from('jobs').insert({ type: 'lesson', payload: { day: today.day, card_id: cardId }, user_id: userId }).select('id').single();
+        if (j.error) throw j.error;
+        lessonJobs.current.set(j.data.id, cardId);
+        setLessons((l) => ({ ...l, [cardId]: { id: j.data.id, status: l[cardId]?.id === j.data.id ? l[cardId].status : 'queued' } }));
+      } catch (e) {
+        setLessons((l) => ({ ...l, [cardId]: { id: '', status: 'failed', error: (e as Error).message } }));
+      }
+    },
+    [userId],
+  );
+
+  // DONE on a lesson tells the Mac to advance the course and save notes on what you
+  // learned. Watching the feed catches DONE from every screen; Sync catches any missed.
+  const doneSeen = useRef<{ day: string; ids: Set<string> } | null>(null);
+  useEffect(() => {
+    const today = feed.today;
+    if (!today) return;
+    const done = new Set(today.cards.filter((c) => c.status === 'done' && isLessonCourse(c.course)).map((c) => c.id));
+    const seen = doneSeen.current;
+    doneSeen.current = { day: today.day, ids: done };
+    if (!seen || seen.day !== today.day || !supabase || !userId) return;
+    for (const id of done) {
+      if (seen.ids.has(id)) continue;
+      pushCard(today, id, userId)
+        .then(() => supabase!.from('jobs').insert({ type: 'condense', payload: { day: today.day, card_id: id }, user_id: userId }))
+        .catch(() => {}); // Sync records it later.
+    }
+  }, [feed.today, userId]);
+
   const value = useMemo<Helper>(
-    () => ({ online, lastSeen: status?.last_seen ?? null, busy: online ? (status?.busy ?? null) : null, job, requestSync, ask, thinking }),
-    [online, status, job, requestSync, ask, thinking],
+    () => ({ online, lastSeen: status?.last_seen ?? null, busy: online ? (status?.busy ?? null) : null, job, requestSync, ask, thinking, explain, lessons }),
+    [online, status, job, requestSync, ask, thinking, explain, lessons],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -118,6 +118,17 @@ describe('Sync-built days', () => {
     expect(m.cards[1].status).toBe('done');
   });
 
+  it('a re-run Sync drops cards it replaced, but keeps ones touched since', () => {
+    const local = {
+      d: {
+        ...day('d', [c('code-1', { updatedAt: '2026-10-22T05:00:00.000Z' }), c('news-x', { status: 'done', updatedAt: '2026-10-22T09:00:00.000Z' })], '2026-10-22T05:00:00.000Z'),
+        source: 'sync' as const,
+      },
+    };
+    const remote = { d: { ...day('d', [c('code-1-01')], '2026-10-22T08:00:00.000Z'), source: 'sync' as const } };
+    expect(S.mergeFeeds(local, remote).d.cards.map((x) => x.id)).toEqual(['code-1-01', 'news-x']);
+  });
+
   it('source survives the round trip', () => {
     const rows = S.toRows({ '2026-10-22': { ...day('2026-10-22', [c('a')]), source: 'sync' } }, 'u1');
     expect(rows.days[0].source).toBe('sync');

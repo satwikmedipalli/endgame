@@ -1,9 +1,12 @@
-import { validateFen } from 'chess.js';
+import { Chess, validateFen } from 'chess.js';
 
 import type { Block } from './types';
 
 const isStr = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
 const optStr = (v: unknown) => v === undefined || typeof v === 'string';
+const SQUARE = /^[a-h][1-8]$/;
+const ARROW = /^[a-h][1-8][a-h][1-8]$/;
+const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /** Returns an error message, or null when the block is valid. */
 export function checkBlock(b: any): string | null {
@@ -21,17 +24,38 @@ export function checkBlock(b: any): string | null {
         ? null
         : 'diagram: rows need code and value';
     case 'chart':
+      if (b.kind === 'candle')
+        return Array.isArray(b.candles) &&
+          b.candles.length >= 2 &&
+          b.candles.every((k: any) => [k?.o, k?.h, k?.l, k?.c].every(num) && k.h >= Math.max(k.o, k.c) && k.l <= Math.min(k.o, k.c))
+          ? null
+          : 'chart: candles need o, h, l, c with low ≤ open/close ≤ high';
       return (b.kind === 'line' || b.kind === 'bar') &&
         Array.isArray(b.points) &&
         b.points.length >= 2 &&
-        b.points.every((p: unknown) => typeof p === 'number' && Number.isFinite(p))
+        b.points.every(num)
         ? null
-        : 'chart: needs kind and at least 2 numbers';
+        : 'chart: needs kind (line, bar or candle) and at least 2 numbers';
     case 'chessBoard': {
       // Positions must come from real games or be checked here; the AI never gets to invent one.
       if (!isStr(b.fen)) return 'chessBoard: fen missing';
       const v = validateFen(b.fen);
-      return v.ok ? null : `chessBoard: ${v.error}`;
+      if (!v.ok) return `chessBoard: ${v.error}`;
+      if (b.highlight !== undefined && !(Array.isArray(b.highlight) && b.highlight.every((x: unknown) => SQUARE.test(String(x))))) return 'chessBoard: highlight must be squares like e4';
+      if (b.arrows !== undefined && !(Array.isArray(b.arrows) && b.arrows.every((x: unknown) => ARROW.test(String(x))))) return 'chessBoard: arrows must look like g1f3';
+      return b.orientation === undefined || b.orientation === 'w' || b.orientation === 'b' ? null : 'chessBoard: orientation is w or b';
+    }
+    case 'chessDrill': {
+      if (!isStr(b.fen) || !validateFen(b.fen).ok) return 'chessDrill: invalid fen';
+      if (!isStr(b.question)) return 'chessDrill: question missing';
+      if (b.mode === 'square') return SQUARE.test(String(b.answer)) ? null : 'chessDrill: answer must be a square';
+      if (b.mode !== 'move') return 'chessDrill: mode is square or move';
+      // The answer has to be a legal move here, written exactly as chess.js writes it.
+      try {
+        return new Chess(b.fen).move(b.answer).san === b.answer ? null : 'chessDrill: answer is not in standard notation';
+      } catch {
+        return `chessDrill: ${JSON.stringify(b.answer)} is not legal in this position`;
+      }
     }
     case 'quiz':
       return isStr(b.question) &&
@@ -45,7 +69,11 @@ export function checkBlock(b: any): string | null {
         ? null
         : 'quiz: needs question, 2+ options, a valid answer index and explain';
     case 'italianPhrase':
-      return isStr(b.it) && isStr(b.en) ? null : 'italianPhrase: it and en required';
+      return isStr(b.it) && isStr(b.en) && (b.learn === undefined || typeof b.learn === 'boolean') ? null : 'italianPhrase: it and en required';
+    case 'vocabReview':
+      return Array.isArray(b.items) && b.items.length > 0 && b.items.every((w: any) => isStr(w?.id) && isStr(w?.it) && isStr(w?.en))
+        ? null
+        : 'vocabReview: items need id, it and en';
     default:
       return `unknown block type ${JSON.stringify(b.type)}`;
   }

@@ -24,6 +24,7 @@ export const palettes = {
     boardLight: '#D3CAEC',
     codeBg: '#0E0E12',
     ok: '#9FD8A0',
+    down: '#E8857A',
   },
   light: {
     bg: '#F4F1EA',
@@ -47,6 +48,7 @@ export const palettes = {
     boardLight: '#E9E3F7',
     codeBg: '#F4F1EA',
     ok: '#3C7D3E',
+    down: '#B03A2E',
   },
 };
 

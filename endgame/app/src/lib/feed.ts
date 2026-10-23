@@ -29,7 +29,7 @@ export function watchFollowUps(prev: DayFeed | null | undefined): Card[] {
       id: `${c.id}-followup`,
       kind: 'watch' as const,
       course: c.course,
-      title: `Did you watch ${c.title}?`,
+      title: `Did you ${c.tag.startsWith('Book') ? 'read' : 'watch'} ${c.title}?`,
       hook: 'Rate it 1–10 so the next picks get closer to your taste.',
       tag: c.tag,
       cta: 'Rate it',
@@ -67,12 +67,15 @@ export function buildDay(day: string, fresh: Card[], prev: DayFeed | null | unde
 /**
  * Adds carry-overs a day is missing. The Mac may build tomorrow the night before,
  * before today's last lessons were opened, so the phone tops it up when the day starts.
+ * For the same reason it drops an untouched lesson you finished the day before.
  */
 export function addCarryOvers(feed: DayFeed, prev: DayFeed | null | undefined): DayFeed {
-  const have = new Set(feed.cards.map((c) => c.id));
+  const finished = new Set((prev?.cards ?? []).filter((c) => c.kind !== 'news' && c.status === 'done').map((c) => c.id));
+  const kept = feed.cards.filter((c) => !(finished.has(c.id) && c.status === 'open' && !c.openedAt));
+  const have = new Set(kept.map((c) => c.id));
   const missing = [...carryOverCards(prev), ...watchFollowUps(prev)].filter((c) => !have.has(c.id));
-  if (!missing.length) return feed;
-  const cards = [...feed.cards];
+  if (!missing.length) return kept.length === feed.cards.length ? feed : { ...feed, cards: kept };
+  const cards = [...kept];
   for (const c of missing) {
     const at = cards.findIndex((x) => x.kind === c.kind);
     cards.splice(at >= 0 ? at : cards.length, 0, { ...c, updatedAt: new Date().toISOString() });
@@ -104,7 +107,7 @@ export function ensureDay(
     ...built,
     cards: built.cards.map((c) => {
       const o = old.get(c.id);
-      return o ? { ...c, status: o.status, chat: o.chat, openedAt: o.openedAt, watch: o.watch } : c;
+      return o ? { ...c, status: o.status, chat: o.chat, openedAt: o.openedAt, watch: o.watch, practice: o.practice } : c;
     }),
   };
 }

@@ -12,7 +12,7 @@ export type CardRow = {
   status: Card['status'];
   opened_at: string | null;
   continued: boolean;
-  content: Pick<Card, 'title' | 'hook' | 'tag' | 'cta' | 'sources' | 'blocks' | 'preview'>;
+  content: Pick<Card, 'title' | 'hook' | 'tag' | 'cta' | 'sources' | 'blocks' | 'preview' | 'practice'>;
   watch: Card['watch'] | null;
   updated_at: string;
 };
@@ -37,7 +37,7 @@ export function toRows(feeds: Record<string, DayFeed>, userId: string): Rows {
         status: c.status,
         opened_at: c.openedAt ?? null,
         continued: !!c.continued,
-        content: { title: c.title, hook: c.hook, tag: c.tag, cta: c.cta, sources: c.sources, blocks: c.blocks, preview: c.preview },
+        content: { title: c.title, hook: c.hook, tag: c.tag, cta: c.cta, sources: c.sources, blocks: c.blocks, preview: c.preview, practice: c.practice },
         watch: c.watch ?? null,
         updated_at: c.updatedAt ?? f.builtAt,
       });
@@ -118,7 +118,11 @@ export function mergeFeeds(local: Record<string, DayFeed>, remote: Record<string
       const win = newer(c.updatedAt, o.updatedAt) ? c : o;
       return { ...win, chat: mergeChat(c.chat, o.chat) };
     });
-    out[day] = { ...lead, cards: syncWins ? cards : [...cards, ...otherById.values()] };
+    // A newer Sync of the same day already kept every card you had touched, so a card
+    // only the phone has is dropped unless it changed after that build.
+    const rebuilt = !syncWins && lead === r && r.source === 'sync';
+    const extras = syncWins ? [] : [...otherById.values()].filter((c) => !rebuilt || newer(c.updatedAt, r.builtAt));
+    out[day] = { ...lead, cards: [...cards, ...extras] };
   }
   return out;
 }

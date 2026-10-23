@@ -2,6 +2,8 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { SyllabusPanel, useCourses } from '@/components/Syllabus';
+import { TastePanels } from '@/components/Taste';
 import { Dot, Serif, T } from '@/components/ui';
 import { dayKey, prevDay, progress, streak } from '@/lib/feed';
 import type { CardKind } from '@/lib/types';
@@ -15,6 +17,7 @@ export default function Progress() {
   const { t, mode } = useTheme();
   const insets = useSafeAreaInsets();
   const { feeds } = useFeed();
+  const courses = useCourses();
   const today = dayKey(new Date());
   const todayFeed = feeds[today];
   const p = todayFeed ? progress(todayFeed) : null;
@@ -78,6 +81,9 @@ export default function Progress() {
           </T>
         </View>
 
+        {courses?.map((c) => <SyllabusPanel key={c.course} course={c} />)}
+        <TastePanels />
+
         <View style={panel}>
           <T w={500} size={15}>
             Courses
@@ -94,7 +100,7 @@ export default function Progress() {
             </View>
           ))}
           <T size={12} color={t.faint}>
-            Syllabus positions and levels arrive with the lesson engine (milestone 4).
+            {courses?.length ? 'Chess and Italian progress arrive with their milestones.' : 'Syllabi appear here after your Mac\'s first Sync.'}
           </T>
         </View>
       </ScrollView>

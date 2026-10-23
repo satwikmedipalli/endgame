@@ -5,7 +5,7 @@ Short log of choices and why. Newest at the bottom of each section.
 ## Architecture
 - **No Anthropic API, ever.** All AI work runs through headless Claude Code (`claude -p`) on the Mac, billed to the Max plan. The model call will sit behind one interface in `worker/` so it could be swapped later.
 - **Supabase is the shared memory** (cards, lessons, chats, course notes). The phone reads it; the Mac worker writes it. Arrives in milestone 2.
-- **Manual Sync, not a cron.** Sync pre-writes every lesson, deep dive, story and pitch, so the phone works with the Mac off. In-app chat needs the Mac awake.
+- **Manual Sync, not a cron.** Sync writes the news and adds teaser cards; lessons, stories and pitches are written only when you open a card (your choice, to save usage), so opening one needs the Mac on. Chat needs the Mac awake too.
 - **Mac off → "Discuss in Claude"** through a custom connector (MCP server on Supabase), one Claude project per course.
 - **Weekly Stockfish analysis stays in a GitHub Action.** It needs no Claude.
 - **No $99 Apple Developer Program.** Free Apple ID sideload, refreshed by AltStore; OTA updates via EAS Update.
@@ -26,7 +26,7 @@ Short log of choices and why. Newest at the bottom of each section.
 - **Auto theme** uses the NOAA sunrise/sunset formula for Richardson, TX (32.95, −96.73). Manual Light/Dark overrides it; tapping the header icon cycles Auto → Light → Dark.
 - **Fonts:** Instrument Serif (headlines), Bricolage Grotesque (everything else), IBM Plex Mono (code only). No Inter Tight, Geist or Geist Mono; no monospaced uppercase labels.
 - **Chat without the Mac** saves the question and says it will be answered once the helper connects (milestone 3).
-- **Chess pieces are Unicode glyphs for now.** They render a little small on web; swap for SVG pieces in the chess milestone.
+- **Chess pieces are Unicode glyphs for now.** They render a little small on web; swap for SVG pieces in the chess milestone. (Done in milestone 6: the cburnett set.)
 - **The done-screen "Replay" from the canvas became "Look back"**, which just hides the overlay so you can review today's cards. It returns on the next launch.
 
 ## Milestone 2 (Supabase)
@@ -49,3 +49,59 @@ Short log of choices and why. Newest at the bottom of each section.
 - **News: Haiku triages, Sonnet writes.** Word-overlap clustering catches most duplicates cheaply; Haiku then merges the rest, fixes regions (a BBC story about India is India) and ranks importance. Sonnet writes only from the source summaries, says "Still unclear" when sources disagree, and lists who covered it. Stories too close to yesterday's are dropped.
 - **Gotcha: `[auth.email] enable_signup = false` turns off email login entirely**, not just signups. Signups are closed with `[auth] enable_signup = false` plus the database trigger; the email provider must stay on.
 
+## Milestone 4 (lesson engine: coding + stocks)
+
+- **Lessons are written only when you open them**, to save Max plan usage, as the spec asked. The cost is that a lesson needs the Mac on the first time; after that it's stored on the card and works offline.
+- **Syllabi are written once** (Sonnet, one call per course: 121 coding topics, 158 stocks topics) and stored in `courses`. Topic ids are `unit-nn`, card ids `code-1-03`, so a topic keeps its identity when carried or skipped.
+- **"You are here" is the first unfinished topic**, computed from the syllabus, not a stored counter, so it can't drift if a carried lesson is finished out of order. (`courses.pointer` is still written for reading at a glance.)
+- **Carried lessons fill their course's slots first**: 2 coding means 2 in total, including yesterday's in-progress one.
+- **Course memory is one line per finished topic**, capped at the latest 80, and goes into every lesson and lesson chat for that course.
+- **The DONE → notes job is sent by watching the feed**, so DONE from the feed card or the lesson screen both count. Sync re-checks the last 14 days in case a job was missed.
+- **The schema the model sees is loose; the app's own `checkBlock` is the validator**, shared by the app and the Mac. Invalid → one retry with the errors → keep the valid blocks (if there are at least 3) → plain text.
+- **New chart kind `candle`** (OHLC, validated low ≤ open/close ≤ high). Stocks lessons show "Education, not financial advice" under the lesson rather than in it.
+- **Fix: the database now enforces "newer wins" for cards.** A trigger ignores an update whose `updated_at` is older than the stored row. Without it, the phone pushing its stale copy erased a lesson the Mac had just written (found while testing).
+- **Fix: a re-run Sync now replaces the phone's untouched cards.** Before, merging two Sync builds of the same day kept both sides' cards.
+- **The phone drops an untouched lesson it finished the day before** (the Mac can build tomorrow before you finish today).
+
+## Milestone 5 (history + watch)
+
+- **Teasers are picked at Sync, stories and pitches are written on tap**, the same rule as lessons. Sync adds two Haiku calls a day; a re-run reuses the day's picks.
+- **No-repeat is enforced in code, not trusted to the model.** Every teaser shown goes into `seen`. Haiku gets the last 250 (history) / 300 (watch) titles to avoid, and every candidate is then checked against the full list by slug and by word overlap (≥ 0.75), so a reworded repeat is caught too.
+- **Taste is a score per trait**, learned only from reactions: history uses era and theme (+2 done, +1 opened, −1 skipped unopened); watch uses type and genres (rating − 5 when rated, else +2 will watch, +1 interested, −2 Not for me, −1 skipped from the feed). Fixed era and theme lists keep the scores comparable.
+- **Randomness on purpose:** of the 2 history picks, one is by taste and one random, and Haiku gets a random region and era nudge each day. Watch explores on 30% of days and rotates film / TV / book.
+- **Ratings**: the app stores the rating and comment on the follow-up card; Sync copies them into `ratings` (with the comment and the title's details) for the record. Progress reads the cards directly so a rating shows at once.
+- **Pitch "Why you might like it" uses your taste profile** once there is one.
+- Card ids: `history-<slug>`, `watch-<film|tv|book>-<slug>`; the follow-up is `<id>-followup`.
+
+## Milestone 6 (chess)
+
+- **Weekly analysis runs as a GitHub Action** (your choice over the Mac): Stockfish 19 from the official release, depth 12, up to 150 new games a week, about 1 s per game. It signs in with your Supabase login from repository secrets, so row-level security applies. Locally it ran 210 games in about a minute.
+- **Severity is the drop in winning chances** (Lichess's formula and thresholds: ≥10 inaccuracy, ≥20 mistake, ≥30 blunder), so a slip while still completely winning isn't counted as a blunder.
+- **Bullet is left out** of analysis and the report; rapid, blitz and daily are studied. The report covers the last 90 days.
+- **Claude never supplies a position.** In lessons it names a position we give it (P0, P1… from a validated line or a real game) plus moves; we replay them with chess.js and drop any board that fails. Drills are made in code from your own games. Opening lines in the syllabus are replayed when it's written, and a topic is dropped if its title or hook names a move that isn't in its line (this caught a real mismatch).
+- **Evaluations come only from engines**: the weekly Stockfish run (review lessons) and the Lichess cloud evaluation (opening lessons, no token).
+- **Lichess opening explorer is skipped** (your choice): it now needs a Lichess API token. Puzzles are left for later too.
+- **Full notation course first** (your choice): 18 lessons with six drills each. Square drills sometimes flip the board to Black's side.
+- **The syllabus is written once from the report**: notation, then openings you play (extra time on your worst-scoring lines), with a review of one of your real mistakes after every two opening lessons. Opening lessons use the latest report when they're written (your stats, where your games leave the line, your opening mistakes).
+- **Openings over several days** use the normal carry-over: open a lesson and don't press DONE, and it comes back tomorrow with its chat.
+- **Arrows and highlights are amber**, not the chess accent, which is too close to the lavender board.
+
+## Milestone 7 (Italian)
+
+- **Spaced repetition is SM-2 with four answers** (Again / Hard / Good / Easy, as in Anki), in `app/src/lib/srs.ts` and shared by the phone and the Mac. The phone only records your answers on the card; the Mac schedules the words when you press DONE, so a review you abandon doesn't count.
+- **The deck is built from lessons.** Each new word or phrase Claude writes is marked `learn`; DONE adds those to the `vocab` table, due the next day. Example sentences aren't added. A word you already have keeps its schedule.
+- **The review is written into the card when you open it** (up to 15 due words), so the 10 minutes hold: about 3 minutes of review, 5 of new material, 2 of chat.
+- **The 10 minutes is a countdown, not a lock.** At zero it says to press DONE; nothing is hidden.
+- **Pronunciation uses the phone's built-in Italian voice** (expo-speech, it-IT), with a written guide in each phrase's note. There's no speech grading.
+- **Chat on an Italian card is in Italian**, with English in brackets and gentle corrections, using only words you've met.
+- **After C1, a next language is left for later.** The course just finishes; adding a language means a new course id and syllabus.
+
+## Milestone 8 (Discuss in Claude)
+- **The connector is a hand-written MCP server** (Streamable HTTP, stateless JSON replies) in a Supabase Edge Function. Four tools, so no SDK or session store; the official MCP Inspector connects to it.
+- **Access is a secret link, not OAuth.** A 48-character random key is the last part of the URL; anything else gets a plain 404. Supabase won't serve web pages, so a sign-in screen would have needed a separate website. The key can be changed at any time.
+- **Inside, it signs in as me** (email and password as function secrets) instead of using the service-role key, so row-level security still guards every read and write.
+- **It only reads, plus one kind of write:** `save_summary` appends a chat line. It can't edit cards, delete anything or mark DONE, so a leaked link can't damage anything.
+- **The summary is an ordinary tutor chat line** ("From the Claude app: …"), so the app shows it through Realtime and the Mac's tutor and course notes see it with no new table.
+- **An unwritten lesson is taught by Claude itself** from the title, hook and course goal and style, since the Mac (which writes lessons) is off.
+- **The text of a card is shared** (`app/src/lib/cardText.ts`) by the Mac's chat and the connector. The deploy bundler can't follow the app's extensionless imports, so the connector imports only files with none.
+- **Projects can't be opened with a prompt filled in**, so with a project link the prompt is copied to the clipboard; without one a new chat opens with it filled in. Claude names its own chats; starting the prompt with the card title makes it name them after the card most of the time.

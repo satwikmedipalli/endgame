@@ -1,0 +1,7 @@
+{
+  "unstable": ["sloppy-imports"],
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.118.0",
+    "@std/assert": "jsr:@std/assert@1"
+  }
+}

@@ -1,17 +1,111 @@
+import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BlockView } from '@/components/Blocks';
 import { Icon } from '@/components/Icon';
 import { DoneButton, OutlineButton, Serif, T } from '@/components/ui';
+import { isLessonCourse } from '@/lib/course';
+import { discussLink } from '@/lib/discuss';
 import type { Card } from '@/lib/types';
 import { useFeed } from '@/store/FeedStore';
 import { useHelper } from '@/store/Helper';
 import { requestAdvance } from '@/store/nav';
 import { useTheme } from '@/theme/ThemeProvider';
 import { accent, fonts, KIND_LABEL } from '@/theme/tokens';
+
+const NOUN: Partial<Record<Card['kind'], string>> = { history: 'story', watch: 'pitch' };
+/** Cards whose content the Mac writes when you tap: lessons, history stories, watch pitches. */
+const writtenOnTap = (c: Card) => !c.blocks.length && (isLessonCourse(c.course) || c.kind === 'history');
+const isBook = (c: Card) => c.tag.startsWith('Book');
+
+/** A card before its content exists: opening it is the Explain tap, so ask the Mac once. */
+function LessonPending({ card }: { card: Card }) {
+  const { t, mode } = useTheme();
+  const { userId } = useFeed();
+  const { online, explain, lessons } = useHelper();
+  const a = accent(card.kind, mode);
+  const job = lessons[card.id];
+  const asked = useRef(false);
+
+  useEffect(() => {
+    if (asked.current || job || !userId) return;
+    asked.current = true;
+    explain(card.id);
+  }, [job, userId, explain, card.id]);
+
+  const failed = job?.status === 'failed';
+  const noun = NOUN[card.kind] ?? 'lesson';
+  const text = !userId
+    ? `The ${noun} is written by your Mac. Sign in to use it.`
+    : failed
+      ? `The ${noun} couldn't be written: ${job.error ?? 'unknown error'}`
+      : job?.status === 'done'
+        ? 'Done. Loading it…'
+        : !online
+          ? `Your Mac is off. The ${noun} gets written as soon as it is on, and appears here.`
+          : job?.status === 'running'
+            ? `Writing the ${noun} on your Mac. This takes a minute or so.`
+            : 'Sent to your Mac…';
+  return (
+    <View style={{ gap: 16, padding: 18, borderRadius: 20, backgroundColor: t.card, borderWidth: 1, borderColor: t.cardLine }}>
+      {card.kind !== 'watch' && (
+        <T size={16} color={t.body} style={{ lineHeight: 24 }}>
+          {card.hook}
+        </T>
+      )}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        {!failed && userId && <ActivityIndicator color={a.color} />}
+        <T size={14} color={t.muted} style={{ flex: 1, lineHeight: 20 }}>
+          {text}
+        </T>
+      </View>
+      {failed && <OutlineButton label="Try again" onPress={() => explain(card.id)} />}
+    </View>
+  );
+}
+
+/** Optional one line after a rating; it goes into your taste profile word for word. */
+function RatingComment({ card }: { card: Card }) {
+  const { t } = useTheme();
+  const { patch } = useFeed();
+  const [text, setText] = useState(card.watch?.comment ?? '');
+  const save = () => text.trim() !== (card.watch?.comment ?? '') && patch(card.id, { watch: { ...card.watch!, comment: text.trim() || undefined } });
+  return (
+    <TextInput
+      value={text}
+      onChangeText={setText}
+      onBlur={save}
+      onSubmitEditing={save}
+      maxLength={140}
+      placeholder="One line about it (optional)"
+      placeholderTextColor={t.faint}
+      accessibilityLabel="Comment on this title"
+      returnKeyType="done"
+      style={{ height: 48, paddingHorizontal: 16, borderRadius: 14, borderWidth: 1, borderColor: t.btnLine, fontFamily: fonts.body, fontSize: 15, color: t.text, outlineStyle: 'none' } as never}
+    />
+  );
+}
+
+/** Italian is capped at 10 minutes a day: a quiet countdown, then a nudge to stop. */
+const ITALIAN_MINUTES = 10;
+function ItalianTimer() {
+  const { t } = useTheme();
+  const [start] = useState(() => Date.now());
+  const [now, setNow] = useState(start);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const left = Math.max(0, ITALIAN_MINUTES * 60 - Math.floor((now - start) / 1000));
+  return (
+    <T size={13} color={left ? t.muted : t.text} w={left ? 400 : 600} style={{ fontVariant: ['tabular-nums'] }}>
+      {left ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} left of today’s 10 minutes` : 'That’s your 10 minutes. Press DONE; the rest can wait for tomorrow.'}
+    </T>
+  );
+}
 
 function WatchFlow({ card }: { card: Card }) {
   const { t, mode } = useTheme();
@@ -36,7 +130,7 @@ function WatchFlow({ card }: { card: Card }) {
     return (
       <View style={{ gap: 14 }}>
         <T size={15} color={t.muted}>
-          {stage === 'rated' ? `You rated it ${card.watch?.rating}/10.` : 'Did you watch it? Tap a rating, or Skip if you have not yet.'}
+          {stage === 'rated' ? `You rated it ${card.watch?.rating}/10.` : `Did you ${isBook(card) ? 'read' : 'watch'} it? Tap a rating, or Skip if you haven't yet.`}
         </T>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
@@ -47,7 +141,7 @@ function WatchFlow({ card }: { card: Card }) {
                 accessibilityRole="button"
                 accessibilityLabel={`Rate ${n} out of 10`}
                 onPress={() => {
-                  patch(card.id, { watch: { stage: 'rated', rating: n } });
+                  patch(card.id, { watch: { ...card.watch, stage: 'rated', rating: n } });
                   mark(card.id, 'done');
                 }}
                 style={{ width: 52, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? a.color : 'transparent', borderWidth: on ? 0 : 1, borderColor: t.btnLine }}
@@ -59,6 +153,7 @@ function WatchFlow({ card }: { card: Card }) {
             );
           })}
         </View>
+        {stage === 'rated' && <RatingComment card={card} />}
       </View>
     );
   }
@@ -77,15 +172,19 @@ function WatchFlow({ card }: { card: Card }) {
     );
   }
 
+  // Interested: the pitch is written now, on your Mac, unless it already exists.
+  if (!card.blocks.length) return <LessonPending card={card} />;
+
+  const verb = isBook(card) ? 'read' : 'watch';
   return (
     <View style={{ gap: 28 }}>
       {card.blocks.map((b, i) => (
         <BlockView key={i} b={b} kind="watch" />
       ))}
-      <Serif size={26}>Will you watch it?</Serif>
+      <Serif size={26}>Will you {verb} it?</Serif>
       {stage === 'decided' ? (
         <T size={15} color={t.muted}>
-          {card.watch?.willWatch ? "Noted. Tomorrow you'll get a quick “Did you watch it?”." : 'Noted. It will not come back.'}
+          {card.watch?.willWatch ? `Noted. Tomorrow you'll get a quick “Did you ${verb} it?”.` : 'Noted. It will not come back.'}
         </T>
       ) : (
         <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -99,10 +198,18 @@ function WatchFlow({ card }: { card: Card }) {
 
 function Chat({ card }: { card: Card }) {
   const { t, mode } = useTheme();
-  const { ask, thinking } = useHelper();
+  const { ask, thinking, online } = useHelper();
   const a = accent(card.kind, mode);
   const [text, setText] = useState('');
+  const [copied, setCopied] = useState(false);
   const waiting = thinking.has(card.id);
+
+  // Opens Claude on this card through the Endgame connector (works with the Mac off).
+  const discuss = async () => {
+    const { url, copy } = discussLink(card);
+    if (copy) setCopied(await Clipboard.setStringAsync(copy).catch(() => false));
+    Linking.openURL(url);
+  };
 
   const send = (msg: string) => {
     const m = msg.trim();
@@ -141,8 +248,8 @@ function Chat({ card }: { card: Card }) {
           </T>
         </View>
       )}
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-        {['Simplify', 'Another example'].map((chip) => (
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+        {(card.kind === 'italian' ? ['Chat with me in Italian', 'Simplify'] : ['Simplify', 'Another example']).map((chip) => (
           <OutlineButton key={chip} label={chip} height={36} size={13} onPress={() => send(chip)} style={{ borderRadius: 999 }} />
         ))}
       </View>
@@ -161,10 +268,15 @@ function Chat({ card }: { card: Card }) {
           <Icon name="send" size={18} color={t.card} stroke={2} />
         </Pressable>
       </View>
-      <Pressable accessibilityRole="link" style={{ alignSelf: 'center', paddingVertical: 10 }}>
+      <Pressable accessibilityRole="link" onPress={discuss} style={{ alignSelf: 'center', paddingVertical: 10, alignItems: 'center', gap: 4 }}>
         <T size={13} color={a.color}>
-          Mac offline? Discuss in Claude →
+          {online ? 'Discuss in Claude →' : 'Mac offline? Discuss in Claude →'}
         </T>
+        {copied && (
+          <T size={12} color={t.faint}>
+            Prompt copied. Paste it in Claude.
+          </T>
+        )}
       </Pressable>
     </View>
   );
@@ -240,9 +352,22 @@ export default function CardScreen() {
               Continued from yesterday. Your chat is below.
             </T>
           )}
+          {card.kind === 'italian' && <ItalianTimer />}
         </View>
 
-        {card.kind === 'watch' ? <WatchFlow card={card} /> : card.blocks.map((b, i) => <BlockView key={i} b={b} kind={card.kind} />)}
+        {card.kind === 'watch' ? (
+          <WatchFlow card={card} />
+        ) : writtenOnTap(card) ? (
+          <LessonPending card={card} />
+        ) : (
+          card.blocks.map((b, i) => <BlockView key={i} b={b} kind={card.kind} cardId={card.id} />)
+        )}
+
+        {card.kind === 'stocks' && (
+          <T size={12} color={t.faint}>
+            Education, not financial advice.
+          </T>
+        )}
 
         {card.kind !== 'watch' && <Chat card={card} />}
       </ScrollView>

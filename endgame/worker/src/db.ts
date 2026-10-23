@@ -1,7 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { pointerOf, type Course, type CourseId } from '../../app/src/lib/course.ts';
 import * as S from '../../app/src/lib/sync.ts';
-import type { DayFeed } from '../../app/src/lib/types.ts';
+import type { Block, Card, DayFeed } from '../../app/src/lib/types.ts';
 
 export type Db = { sb: SupabaseClient; userId: string };
 
@@ -56,4 +57,69 @@ export async function saveDay(db: Db, feed: DayFeed) {
   const del = db.sb.from('cards').delete().eq('day', feed.day);
   const res = keep.length ? await del.not('id', 'in', `(${keep.map((k) => `"${k}"`).join(',')})`) : await del;
   if (res.error) throw res.error;
+}
+
+export async function loadCourse(db: Db, course: CourseId): Promise<Course | null> {
+  const { data, error } = await db.sb.from('courses').select('course, syllabus, summary').eq('course', course).maybeSingle();
+  if (error) throw error;
+  return data && Array.isArray(data.syllabus) && data.syllabus.length ? (data as Course) : null;
+}
+
+export async function saveCourse(db: Db, c: Course) {
+  const { error } = await db.sb.from('courses').upsert({
+    user_id: db.userId,
+    course: c.course,
+    syllabus: c.syllabus,
+    summary: c.summary,
+    pointer: pointerOf(c.syllabus),
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+/** Writes a card's lesson without touching its status, chat or position. */
+export async function saveBlocks(db: Db, day: string, cardId: string, blocks: Block[]) {
+  const { data, error } = await db.sb.from('cards').select('content').eq('day', day).eq('id', cardId).single();
+  if (error) throw error;
+  const u = await db.sb
+    .from('cards')
+    .update({ content: { ...data.content, blocks }, updated_at: new Date().toISOString() })
+    .eq('day', day)
+    .eq('id', cardId);
+  if (u.error) throw u.error;
+}
+
+export type Seen<M = Record<string, unknown>> = { key: string; meta: M; created_at: string };
+
+/** Every row of a query; PostgREST returns at most 1000 per request. */
+async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await page(from, from + 999);
+    if (error) throw error;
+    out.push(...((data ?? []) as T[]));
+    if (!data || data.length < 1000) return out;
+  }
+}
+
+/** Everything ever shown for a kind (history teasers, watch titles): the no-repeat list. */
+export function loadSeen<M>(db: Db, kind: string): Promise<Seen<M>[]> {
+  return all((a, b) => db.sb.from('seen').select('key, meta, created_at').eq('kind', kind).order('created_at').range(a, b));
+}
+
+export async function addSeen(db: Db, kind: string, rows: { key: string; meta: object }[]) {
+  if (!rows.length) return;
+  const { error } = await db.sb.from('seen').upsert(rows.map((r) => ({ ...r, kind, user_id: db.userId })), { ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+export type Reaction = { id: string; day: string; status: string; opened: boolean; watch: Card['watch'] | null };
+
+/** Your latest reaction to each card of a kind, across every stored day. */
+export async function loadReactions(db: Db, kind: string): Promise<Reaction[]> {
+  type Row = { id: string; day: string; status: string; opened_at: string | null; watch: Card['watch'] | null };
+  const rows = await all<Row>((a, b) => db.sb.from('cards').select('id, day, status, opened_at, watch').eq('kind', kind).order('day').order('id').range(a, b));
+  const latest = new Map<string, Reaction>();
+  for (const r of rows) latest.set(r.id, { id: r.id, day: r.day, status: r.status, opened: !!r.opened_at, watch: r.watch });
+  return [...latest.values()];
 }
