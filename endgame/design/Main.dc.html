@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Endgame feed</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Bricolage+Grotesque:opsz,wght@12..96,400..600&amp;family=Instrument+Sans:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;600&amp;family=Manrope:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.eg-scroller::-webkit-scrollbar{display:none}
+@keyframes egEnter{from{transform:translateY(0) scale(.93)}to{transform:translateY(0) scale(1)}}
+@keyframes egExit{from{transform:translateY(0) scale(1)}to{transform:translateY(694px) scale(.9)}}
+@keyframes egDim{from{opacity:0}to{opacity:.78}}
+@keyframes egLift{from{transform:translateY(56px);opacity:.15}to{transform:none;opacity:1}}
+@supports (animation-timeline: view()) {
+  .eg-page{view-timeline:--eg-card block}
+  .eg-card{
+    animation:egEnter cubic-bezier(.2,.7,.2,1) backwards,egExit cubic-bezier(.45,0,.55,1) forwards;
+    animation-timeline:--eg-card,--eg-card;
+    animation-range:entry 0% entry 100%,exit 0% exit 100%;
+  }
+  .eg-dim{
+    animation:egDim linear both;
+    animation-timeline:--eg-card;
+    animation-range:exit 0% exit 100%;
+  }
+  .eg-inner{
+    animation:egLift cubic-bezier(.2,.7,.2,1) backwards;
+    animation-timeline:--eg-card;
+    animation-range:entry 25% entry 100%;
+  }
+}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{t.bg}}; color: {{t.text}}; font-family: {{fontStack}}; transition: background-color 1.2s ease, color 1.2s ease">
+
+  <header style="position: absolute; top: 0; left: 0; right: 0; height: 120px; box-sizing: border-box; padding: 14px 10px 0 16px; display: flex; flex-direction: column; gap: 8px; z-index: 300">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: 'Instrument Serif', serif; font-size: 28px; font-style: italic; letter-spacing: -0.01em">Endgame</span>
+      <div style="display: flex; align-items: center; gap: 4px">
+        <span style="font-size: 13px; font-weight: 500; color: {{t.muted}}">{{dateLabel}}</span>
+        <button type="button" onClick="{{cycleTheme}}" aria-label="{{themeButtonLabel}}" style="width: 44px; height: 44px; border: 0; border-radius: 14px; background: transparent; color: {{t.muted}}; display: flex; align-items: center; justify-content: center; cursor: pointer">
+          <sc-if value="{{iconAuto}}" hint-placeholder-val="{{ true }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"></path></svg>
+          </sc-if>
+          <sc-if value="{{iconLight}}" hint-placeholder-val="{{ false }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          </sc-if>
+          <sc-if value="{{iconDark}}" hint-placeholder-val="{{ false }}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"></path></svg>
+          </sc-if>
+        </button>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; padding-right: 6px">
+      <div style="flex: 1; display: flex; gap: 4px" aria-hidden="true">
+        <sc-for list="{{squares}}" as="sq" hint-placeholder-count="8">
+          <div style="flex: 1; height: 6px; border-radius: 2px; background: {{sq.bg}}; box-shadow: inset 0 0 0 1px {{sq.ring}}; transition: background 500ms ease, box-shadow 500ms ease"></div>
+        </sc-for>
+      </div>
+      <span style="font-size: 13px; font-weight: 500; color: {{t.muted}}; font-variant-numeric: tabular-nums">{{cleared}} / {{total}} cleared</span>
+    </div>
+    <span style="font-size: 11px; color: {{t.faint}}">{{themeLabel}}</span>
+  </header>
+
+  <div class="eg-scroller" ref="{{setEl}}" onScroll="{{onScroll}}" style="position: absolute; top: 120px; left: 0; right: 0; height: 724px; overflow-y: auto; overflow-x: hidden; scroll-snap-type: y mandatory; overscroll-behavior: contain; scrollbar-width: none">
+    <sc-for list="{{cards}}" as="card" hint-placeholder-count="2">
+      <div class="eg-page" style="position: relative; height: 724px; scroll-snap-align: start; scroll-snap-stop: always; z-index: {{card.z}}">
+        <article class="eg-card" style="position: absolute; top: 16px; left: 16px; right: 16px; height: 668px; transform-origin: top center; will-change: transform; transform: {{card.transform}}; border-radius: 28px; background: {{t.card}}; box-shadow: 0 0 0 1px {{t.cardLine}}, {{t.shadow}}; overflow: hidden; transition: background-color 1.2s ease">
+          <div class="eg-inner" style="position: absolute; inset: 0; display: flex; flex-direction: column; padding: 22px 22px 20px; box-sizing: border-box">
+            <div aria-hidden="true" style="position: absolute; top: 0; left: 22px; width: 96px; height: 1px; background: {{card.accent}}"></div>
+            <div aria-hidden="true" style="position: absolute; right: 18px; top: 6px; font-family: 'Instrument Serif', serif; font-size: 120px; line-height: 1; color: {{card.accent}}; opacity: 0.1">{{card.num}}</div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+              <span style="display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 12px 0 10px; border-radius: 999px; box-shadow: inset 0 0 0 1px {{card.accentLine}}; color: {{card.accent}}; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <sc-if value="{{card.isNews}}" hint-placeholder-val="{{ true }}"><path d="M4 5h12v14H6a2 2 0 0 1-2-2z"></path><path d="M16 9h4v8a2 2 0 0 1-2 2"></path><path d="M7 9h6M7 13h6M7 16h4"></path></sc-if>
+                  <sc-if value="{{card.isCode}}" hint-placeholder-val="{{ false }}"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 6l-3 12"></path></sc-if>
+                  <sc-if value="{{card.isHistory}}" hint-placeholder-val="{{ false }}"><path d="M6 3h12M6 21h12"></path><path d="M7 3c0 4 5 6 5 9 0-3 5-5 5-9M7 21c0-4 5-6 5-9 0 3 5 5 5 9"></path></sc-if>
+                  <sc-if value="{{card.isChess}}" hint-placeholder-val="{{ false }}"><circle cx="12" cy="6.5" r="2.5"></circle><path d="M10 10h4l1.2 6.5H8.8z"></path><path d="M6.5 20h11M8 16.5h8"></path></sc-if>
+                  <sc-if value="{{card.isStocks}}" hint-placeholder-val="{{ false }}"><path d="M7 4v16M17 6v12"></path><rect x="5" y="8" width="4" height="7" rx="1"></rect><rect x="15" y="9" width="4" height="5" rx="1"></rect></sc-if>
+                  <sc-if value="{{card.isItalian}}" hint-placeholder-val="{{ false }}"><path d="M5 5h14v10H10l-4 4v-4H5z"></path></sc-if>
+                  <sc-if value="{{card.isWatch}}" hint-placeholder-val="{{ false }}"><rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M3 10h18M8 6l-1 4M13 6l-1 4M18 6l-1 4"></path></sc-if>
+                </svg>
+                {{card.label}}
+              </span>
+              <span style="font-size: 13px; font-weight: 500; color: {{t.muted}}; position: relative">{{card.tag}}</span>
+            </div>
+
+            <sc-if value="{{card.continued}}" hint-placeholder-val="{{ false }}">
+              <span style="align-self: flex-start; margin-top: 14px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; color: {{t.text}}; padding: 5px 10px; border-radius: 999px; background: {{t.chip}}">Continued from yesterday</span>
+            </sc-if>
+
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; position: relative">
+              <h2 style="margin: 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 36px; line-height: 1.06; letter-spacing: -0.01em">{{card.title}}</h2>
+              <p style="margin: 0; font-size: 16px; line-height: 1.5; color: {{t.muted}}">{{card.hook}}</p>
+
+              <sc-if value="{{card.isNews}}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px">
+                  <div style="display: flex" aria-hidden="true">
+                    <span style="width: 18px; height: 18px; border-radius: 50%; background: {{t.dot1}}; box-shadow: 0 0 0 2px {{t.card}}"></span>
+                    <span style="width: 18px; height: 18px; border-radius: 50%; background: {{t.dot2}}; margin-left: -6px; box-shadow: 0 0 0 2px {{t.card}}"></span>
+                    <span style="width: 18px; height: 18px; border-radius: 50%; background: {{t.dot3}}; margin-left: -6px; box-shadow: 0 0 0 2px {{t.card}}"></span>
+                  </div>
+                  <span style="font-size: 13px; color: {{t.muted}}">{{card.meta}}</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{card.isChess}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px">
+                  <div style="display: flex; gap: 6px">
+                    <div style="display: flex; flex-direction: column; justify-content: space-around; font-size: 11px; font-weight: 500; color: {{t.faint}}" aria-hidden="true">
+                      <sc-for list="{{ranks}}" as="rk" hint-placeholder-count="8"><span>{{rk}}</span></sc-for>
+                    </div>
+                    <div role="img" aria-label="Chessboard with a white bishop on d1" style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 200px; height: 200px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px {{t.cardLine}}">
+                      <sc-for list="{{board}}" as="b" hint-placeholder-count="64">
+                        <div style="background: {{b.bg}}; color: {{b.fg}}; display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1">{{b.glyph}}</div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 200px; margin-left: 14px; font-size: 11px; font-weight: 500; color: {{t.faint}}; text-align: center" aria-hidden="true">
+                    <sc-for list="{{files}}" as="fl" hint-placeholder-count="8"><span>{{fl}}</span></sc-for>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{card.isItalian}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; padding: 16px 16px 16px 18px; border-radius: 18px; background: {{card.accentWash}}; box-shadow: inset 0 0 0 1px {{card.accentLine}}">
+                  <div style="display: flex; flex-direction: column; gap: 4px">
+                    <span lang="it" style="font-family: 'Instrument Serif', serif; font-style: italic; font-size: 28px; line-height: 1.1">Ciao, come stai?</span>
+                    <span style="font-size: 13px; color: {{t.muted}}">Hi, how are you?</span>
+                  </div>
+                  <button type="button" onClick="{{speak}}" aria-label="Play pronunciation" style="width: 44px; height: 44px; flex: none; border-radius: 50%; border: 0; background: {{card.accent}}; color: {{t.card}}; display: flex; align-items: center; justify-content: center; cursor: pointer">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path></svg>
+                  </button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{card.isStocks}}" hint-placeholder-val="{{ false }}">
+                <span style="font-size: 12px; color: {{t.faint}}">Education, not financial advice.</span>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{card.open}}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; flex-direction: column; gap: 10px; position: relative">
+                <a href="{{card.href}}" style="height: 54px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; text-decoration: none; font-size: 16px; font-weight: 600; color: {{card.accent}}; background: {{card.accentWash}}; box-shadow: inset 0 0 0 1px {{card.accentLine}}">
+                  <span>{{card.cta}}</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+                </a>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+                  <button type="button" onClick="{{card.skip}}" style="height: 50px; border-radius: 16px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px {{t.btnLine}}; color: {{t.text}}; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer">Skip</button>
+                  <button type="button" onClick="{{card.done}}" style="height: 50px; border-radius: 16px; border: 0; background: {{t.doneBg}}; color: {{t.doneFg}}; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.08em; cursor: pointer">DONE</button>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{card.cleared}}" hint-placeholder-val="{{ false }}">
+              <div style="height: 114px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid {{t.cardLine}}; position: relative">
+                <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; color: {{t.muted}}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg>
+                  {{card.statusLabel}}
+                </span>
+                <button type="button" onClick="{{card.undo}}" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px {{t.btnLine}}; color: {{t.muted}}; font-family: inherit; font-size: 13px; cursor: pointer">Undo</button>
+              </div>
+            </sc-if>
+          </div>
+          <div class="eg-dim" aria-hidden="true" style="position: absolute; inset: 0; background: {{t.bg}}; opacity: {{card.dim}}; pointer-events: none"></div>
+        </article>
+        <sc-if value="{{card.first}}" hint-placeholder-val="{{ false }}">
+          <div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 10px; display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: {{t.faint}}; opacity: {{hintOpacity}}; transition: opacity 400ms ease">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg>
+            Swipe up
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+
+    <div style="position: relative; height: 724px; scroll-snap-align: start; z-index: 200; box-sizing: border-box; padding: 40px 32px; display: flex; flex-direction: column; justify-content: center; gap: 18px; background: {{t.bg}}">
+      <h2 style="margin: 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 40px; line-height: 1.05">Almost there.</h2>
+      <p style="margin: 0; font-size: 16px; line-height: 1.5; color: {{t.muted}}">{{remainingLabel}} The day ends when every card is done or skipped.</p>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <sc-for list="{{remaining}}" as="rm" hint-placeholder-count="2">
+          <button type="button" onClick="{{rm.go}}" style="min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-radius: 14px; border: 0; background: {{t.card}}; box-shadow: inset 0 0 0 1px {{t.cardLine}}; color: {{t.text}}; font-family: inherit; font-size: 14px; text-align: left; cursor: pointer">
+            <span style="width: 6px; height: 6px; border-radius: 2px; background: {{rm.accent}}; flex: none"></span>
+            <span style="flex: 1">{{rm.title}}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <section aria-hidden="{{overlayHidden}}" style="position: absolute; inset: 0; z-index: 500; background: {{t.bg}}; display: flex; flex-direction: column; justify-content: center; padding: 0 32px; gap: 28px; opacity: {{overlayOpacity}}; pointer-events: {{overlayPe}}; transition: opacity 900ms ease">
+    <div aria-hidden="true" style="align-self: flex-start; font-family: 'Instrument Serif', serif; font-size: 64px; line-height: 1; transform-origin: 50% 85%; transform: rotate({{kingRot}}deg); transition: transform 1.4s 300ms cubic-bezier(.6,0,.2,1)">♔</div>
+    <div style="display: flex; flex-direction: column; gap: 6px; transform: translateY({{riseY}}px); transition: transform 1.1s 200ms cubic-bezier(.2,.8,.2,1)">
+      <h1 style="margin: 0; font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 46px; line-height: 1.02; letter-spacing: -0.015em">You're done for today.</h1>
+      <p style="margin: 0; font-family: 'Instrument Serif', serif; font-style: italic; font-size: 30px; color: {{t.muted}}">Close your phone.</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px; padding-top: 22px; border-top: 1px solid {{t.cardLine}}">
+      <span style="font-size: 15px; font-weight: 500; color: {{t.muted}}">{{doneCount}} done · {{skipCount}} skipped</span>
+      <sc-for list="{{doneList}}" as="d" hint-placeholder-count="4">
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 14px">
+          <span style="width: 6px; height: 6px; border-radius: 2px; background: {{d.accent}}; flex: none"></span>
+          <span>{{d.title}}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <span style="font-size: 12px; color: {{t.faint}}">Tomorrow's set arrives at your next Sync.</span>
+      <button type="button" onClick="{{reset}}" style="height: 44px; padding: 0 14px; border-radius: 12px; border: 0; background: transparent; box-shadow: inset 0 0 0 1px {{t.btnLine}}; color: {{t.muted}}; font-family: inherit; font-size: 13px; cursor: pointer">Replay</button>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"font":{"editor":"enum","options":["Bricolage Grotesque","Instrument Sans","Space Grotesk","Manrope"],"default":"Bricolage Grotesque"},"theme":{"editor":"enum","options":["auto","light","dark"],"default":"light"},"$preview":{"width":390,"height":844}}'>
+var EG_H = 724;
+var EG_PIN = 694;
+var EG_TZ = "America/Chicago";
+var EG_LAT = 32.95, EG_LNG = -96.73;
+
+var EG_THEMES = {
+  dark: {
+    bg: "#0A0A0D", card: "#141419", cardLine: "rgba(255,255,255,0.07)", shadow: "0 30px 60px rgba(0,0,0,0.55)",
+    text: "#F2EEE6", muted: "#A19D96", faint: "#8E8A84", chip: "rgba(255,255,255,0.07)", btnLine: "rgba(255,255,255,0.14)",
+    doneBg: "#F2EEE6", doneFg: "#0A0A0D", sqIdle: "#1E1E25", sqCur: "#26262E", sqDone: "#F2EEE6", sqSkip: "rgba(255,255,255,0.28)",
+    dot1: "#2A2A33", dot2: "#34343E", dot3: "#3F3F4A",
+    boardDark: "#3B3552", boardLight: "#D3CAEC"
+  },
+  light: {
+    bg: "#F4F1EA", card: "#FFFFFF", cardLine: "rgba(23,22,26,0.08)", shadow: "0 24px 50px rgba(60,48,30,0.12)",
+    text: "#17161A", muted: "#5C5852", faint: "#6B675F", chip: "rgba(23,22,26,0.06)", btnLine: "rgba(23,22,26,0.16)",
+    doneBg: "#17161A", doneFg: "#F4F1EA", sqIdle: "#E3DED3", sqCur: "#D6D0C3", sqDone: "#17161A", sqSkip: "rgba(23,22,26,0.3)",
+    dot1: "#E6E1D7", dot2: "#D9D3C7", dot3: "#CCC5B7",
+    boardDark: "#7E6FB8", boardLight: "#E9E3F7"
+  }
+};
+
+var EG_CARDS = [
+  { kind: "news", label: "News", tag: "US · Politics", title: "[Top US story — the headline pulled at Sync]", hook: "[Source] · 7:42 AM", meta: "Covered by [N] sources", cta: "Deep dive", dark: ["#E8B86D", "232,184,109"], light: ["#8C5F16", "140,95,22"] },
+  { kind: "news", label: "News", tag: "IN · Cricket", title: "[Top India story — the headline pulled at Sync]", hook: "[Source] · 6:58 AM", meta: "Covered by [N] sources", cta: "Deep dive", dark: ["#E8B86D", "232,184,109"], light: ["#8C5F16", "140,95,22"] },
+  { kind: "code", label: "Coding", tag: "Lesson 1 · ~7 min", title: "What a computer actually does with your code", hook: "Programs are recipes. The computer is a very fast, very literal cook.", cta: "Explain", href: "Lesson.dc.html", dark: ["#7FD1B9", "127,209,185"], light: ["#1F7A63", "31,122,99"] },
+  { kind: "history", label: "History", tag: "Australia · 1932", title: "The Great Emu War", hook: "Soldiers with machine guns were sent to fight a flock of birds. The birds won.", cta: "Explain", dark: ["#E89A7F", "232,154,127"], light: ["#A84E33", "168,78,51"] },
+  { kind: "chess", label: "Chess", tag: "Notation · drill 3", title: "Where does Bg4 go?", hook: "Find the square, then say the move out loud.", cta: "Start drill", continued: true, dark: ["#C9B8FF", "201,184,255"], light: ["#6A55B8", "106,85,184"] },
+  { kind: "stocks", label: "Markets", tag: "Lesson 1 · ~15 min", title: "What you really own when you buy a share", hook: "A tiny slice of a real company: its profits, its debts and its future.", cta: "Explain", dark: ["#9DB8FF", "157,184,255"], light: ["#3B5BB5", "59,91,181"] },
+  { kind: "italian", label: "Italiano", tag: "A1 · ~8 min", title: "Saying hello", hook: "3 new words, 4 to review, then a short chat.", cta: "Start", dark: ["#9FD8A0", "159,216,160"], light: ["#3C7D3E", "60,125,62"] },
+  { kind: "watch", label: "Watch", tag: "Film · 2016", title: "Arrival", hook: "One spoiler-free pitch, only if you want it.", cta: "Interested?", dark: ["#F2A6C8", "242,166,200"], light: ["#A8457A", "168,69,122"] }
+];
+
+function egSun(now) {
+  var rad = Math.PI / 180;
+  var lw = -EG_LNG;
+  var J = now.getTime() / 86400000 + 2440587.5;
+  var n = Math.round(J - 2451545.0009 - lw / 360);
+  var Js = 2451545.0009 + lw / 360 + n;
+  var M = (357.5291 + 0.98560028 * (Js - 2451545)) % 360;
+  var C = 1.9148 * Math.sin(M * rad) + 0.02 * Math.sin(2 * M * rad) + 0.0003 * Math.sin(3 * M * rad);
+  var L = (M + C + 180 + 102.9372) % 360;
+  var Jt = Js + 0.0053 * Math.sin(M * rad) - 0.0069 * Math.sin(2 * L * rad);
+  var dec = Math.asin(Math.sin(L * rad) * Math.sin(23.4397 * rad));
+  var cosW = (Math.sin(-0.833 * rad) - Math.sin(EG_LAT * rad) * Math.sin(dec)) / (Math.cos(EG_LAT * rad) * Math.cos(dec));
+  var w = Math.acos(Math.max(-1, Math.min(1, cosW))) / rad;
+  var toMs = function (j) { return (j - 2440587.5) * 86400000; };
+  return { rise: toMs(Jt - w / 360), set: toMs(Jt + w / 360) };
+}
+
+function egTime(ms) {
+  try { return new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: EG_TZ }); }
+  catch (e) { return ""; }
+}
+
+function egEaseInOut(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+
+class Component extends DCLogic {
+  constructor(...args) {
+    super(...args);
+    var native = false;
+    try { native = !!(window.CSS && CSS.supports("animation-timeline: view()")); } catch (e) {}
+    this.native = native;
+    this.state = { st: 0, cur: 0, scrolled: false, results: {}, finished: false, themePref: null };
+    this.el = null;
+    this.raf = null;
+  }
+
+  scrollToIndex(i) {
+    if (this.el) this.el.scrollTo({ top: i * EG_H, behavior: "smooth" });
+  }
+
+  mark(i, result) {
+    var results = Object.assign({}, this.state.results);
+    results[i] = result;
+    this.setState({ results: results });
+    var self = this;
+    var all = EG_CARDS.every(function (c, k) { return !!results[k]; });
+    if (all) { setTimeout(function () { self.setState({ finished: true }); }, 700); }
+    else { setTimeout(function () { self.scrollToIndex(i + 1); }, 220); }
+  }
+
+  undo(i) {
+    var results = Object.assign({}, this.state.results);
+    delete results[i];
+    this.setState({ results: results });
+  }
+
+  handleScroll() {
+    if (!this.el) return;
+    var st = this.el.scrollTop;
+    var cur = Math.round(st / EG_H);
+    var results = this.state.results;
+    var changed = false;
+    EG_CARDS.forEach(function (c, i) {
+      if (c.kind === "news" && i < cur && !results[i]) {
+        if (!changed) { results = Object.assign({}, results); changed = true; }
+        results[i] = "skip";
+      }
+    });
+    var scrolled = this.state.scrolled || st > 20;
+    if (this.native) {
+      if (cur !== this.state.cur || changed || scrolled !== this.state.scrolled) {
+        this.setState({ cur: cur, results: results, scrolled: scrolled });
+      }
+    } else {
+      this.setState({ st: st, cur: cur, results: results, scrolled: scrolled });
+    }
+  }
+
+  resolveTheme() {
+    var pref = this.state.themePref || this.props.theme || "light";
+    var now = new Date();
+    var sun = egSun(now);
+    var t = now.getTime();
+    var lightNow = t >= sun.rise && t < sun.set;
+    if (pref === "light") return { pref: pref, mode: "light", label: "Light theme, set by hand · tap the icon for Auto" };
+    if (pref === "dark") return { pref: pref, mode: "dark", label: "Dark theme, set by hand · tap the icon for Auto" };
+    if (lightNow) return { pref: "auto", mode: "light", label: "Auto · light until sunset, " + egTime(sun.set) };
+    var nextRise = t >= sun.set ? sun.rise + 86400000 : sun.rise;
+    return { pref: "auto", mode: "dark", label: "Auto · dark until sunrise, " + egTime(nextRise) };
+  }
+
+  renderVals() {
+    var self = this;
+    var st = this.state.st;
+    var cur = this.state.cur;
+    var results = this.state.results;
+    var native = this.native;
+    var theme = this.resolveTheme();
+    var T = EG_THEMES[theme.mode];
+
+    var cards = EG_CARDS.map(function (c, i) {
+      var acc = c[theme.mode];
+      var transform = "none", dim = 0;
+      if (!native) {
+        var p = Math.max(0, Math.min(1, (st - i * EG_H) / EG_H));
+        var e = egEaseInOut(p);
+        var q = Math.max(0, Math.min(1, (i * EG_H - st) / EG_H));
+        transform = "translateY(" + (p * EG_PIN).toFixed(1) + "px) scale(" + (1 - 0.1 * e - 0.07 * q).toFixed(4) + ")";
+        dim = (0.78 * p).toFixed(3);
+      }
+      var r = results[i];
+      return {
+        label: c.label, tag: c.tag, title: c.title, hook: c.hook, meta: c.meta || "", cta: c.cta,
+        accent: acc[0],
+        accentLine: "rgba(" + acc[1] + ",0.35)",
+        accentWash: "rgba(" + acc[1] + ",0.10)",
+        href: c.href ? (theme.mode === "light" ? "LessonLight.dc.html" : "Lesson.dc.html") : "#",
+        num: (i + 1 < 10 ? "0" : "") + (i + 1),
+        continued: !!c.continued,
+        first: i === 0,
+        isNews: c.kind === "news", isCode: c.kind === "code", isHistory: c.kind === "history",
+        isChess: c.kind === "chess", isStocks: c.kind === "stocks", isItalian: c.kind === "italian",
+        isWatch: c.kind === "watch",
+        open: !r, cleared: !!r,
+        statusLabel: r === "done" ? "Done" : (c.kind === "news" ? "Skipped (scrolled past)" : "Skipped · back another day"),
+        z: i + 1,
+        transform: transform,
+        dim: dim,
+        done: function () { self.mark(i, "done"); },
+        skip: function () { self.mark(i, "skip"); },
+        undo: function () { self.undo(i); }
+      };
+    });
+
+    var squares = EG_CARDS.map(function (c, i) {
+      var r = results[i];
+      if (r === "done") return { bg: T.sqDone, ring: "transparent" };
+      if (r === "skip") return { bg: "transparent", ring: T.sqSkip };
+      if (i === cur) return { bg: T.sqCur, ring: c[theme.mode][0] };
+      return { bg: T.sqIdle, ring: "transparent" };
+    });
+
+    var filesStr = "abcdefgh";
+    var board = [];
+    for (var rk = 8; rk >= 1; rk--) {
+      for (var fi = 0; fi < 8; fi++) {
+        var dark = (fi + rk) % 2 === 1;
+        board.push({ bg: dark ? T.boardDark : T.boardLight, fg: dark ? "#FFFFFF" : "#1A1726", glyph: (filesStr[fi] + rk) === "d1" ? "♗" : "" });
+      }
+    }
+
+    var doneList = [], remaining = [];
+    var doneCount = 0, skipCount = 0;
+    EG_CARDS.forEach(function (c, i) {
+      var r = results[i];
+      if (r === "done") { doneCount++; doneList.push({ title: c.title, accent: c[theme.mode][0] }); }
+      else if (r === "skip") skipCount++;
+      else remaining.push({ title: c.title, accent: c[theme.mode][0], go: function () { self.scrollToIndex(i); } });
+    });
+
+    var dateLabel = "";
+    try { dateLabel = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: EG_TZ }); } catch (e) {}
+
+    var nextPref = { auto: "light", light: "dark", dark: "auto" }[theme.pref];
+    var fin = this.state.finished;
+    return {
+      t: T,
+      fontStack: "'" + (this.props.font || "Bricolage Grotesque") + "', system-ui, sans-serif",
+      iconAuto: theme.pref === "auto",
+      iconLight: theme.pref === "light",
+      iconDark: theme.pref === "dark",
+      themeLabel: theme.label,
+      themeButtonLabel: "Theme: " + theme.pref + ". Switch to " + nextPref,
+      cycleTheme: function () { self.setState({ themePref: nextPref }); },
+      dateLabel: dateLabel,
+      cards: cards,
+      squares: squares,
+      cleared: doneCount + skipCount,
+      total: EG_CARDS.length,
+      board: board,
+      ranks: ["8", "7", "6", "5", "4", "3", "2", "1"],
+      files: ["a", "b", "c", "d", "e", "f", "g", "h"],
+      hintOpacity: this.state.scrolled ? 0 : 1,
+      remaining: remaining,
+      remainingLabel: remaining.length === 1 ? "1 card is still open." : remaining.length + " cards are still open.",
+      doneCount: doneCount,
+      skipCount: skipCount,
+      doneList: doneList,
+      overlayOpacity: fin ? 1 : 0,
+      overlayPe: fin ? "auto" : "none",
+      overlayHidden: fin ? "false" : "true",
+      kingRot: fin ? -90 : 0,
+      riseY: fin ? 0 : 14,
+      setEl: function (el) { self.el = el; },
+      onScroll: function (e) {
+        if (e && e.currentTarget) self.el = e.currentTarget;
+        if (self.raf) return;
+        self.raf = requestAnimationFrame(function () { self.raf = null; self.handleScroll(); });
+      },
+      speak: function () {
+        try {
+          var u = new SpeechSynthesisUtterance("Ciao, come stai?");
+          u.lang = "it-IT";
+          window.speechSynthesis.speak(u);
+        } catch (e) {}
+      },
+      reset: function () {
+        self.setState({ results: {}, finished: false, st: 0, cur: 0, scrolled: false });
+        if (self.el) self.el.scrollTo({ top: 0 });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
