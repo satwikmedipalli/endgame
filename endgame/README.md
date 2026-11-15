@@ -89,6 +89,8 @@ The free project pauses after 7 days without use; restore it from the dashboard 
 
 Runs in the background on the Mac, signs in as you (so row-level security applies), and does the jobs the app asks for. Claude runs through `claude -p` on the Max plan; `ANTHROPIC_API_KEY` is stripped so it can never bill the API.
 
+**Switching Claude accounts:** the helper uses whatever account the `claude` CLI is logged into. To pin it to one account, run `claude setup-token` (log in with that account), put the token in `worker/.env` as `CLAUDE_CODE_OAUTH_TOKEN=...`, then `launchctl kickstart -k gui/$(id -u)/com.endgame.helper`. Then re-add the connector (below) on that account.
+
 ```bash
 cd ~/endgame/endgame/worker
 npm install
