@@ -2,7 +2,13 @@
 
 **A daily feed that actually ends.** Clear every card, then put the phone down.
 
+**[Try the live demo →](https://endgame-silk.vercel.app)** (best on a phone, or in a narrow browser window)
+
 ![Endgame: coding, chess and Italian cards](docs/endgame.png)
+
+<p align="center"><img src="docs/feed.gif" width="300" alt="Swiping through the feed: each card sinks back as the next slides over it, then a news deep dive opens" /></p>
+
+The demo runs entirely in your browser with a sample day. Its news cards are 12 real ones from a Sync on November 11, 2026. It isn't connected to a database or to Claude, so chat replies won't arrive.
 
 Every feed app is built so you never reach the bottom. Endgame is the opposite: each day is a fixed set of cards (real news, coding and stock-market lessons, history, chess, Italian, and one thing to watch). Every card is **Done** or **Skip**. When they're all cleared, the app tells you to close your phone.
 

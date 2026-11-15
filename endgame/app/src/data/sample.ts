@@ -1,5 +1,6 @@
 // Dummy content for milestone 1. Sync replaces all of this from milestone 3 on.
 import type { Block, Card, DayFeed } from '../lib/types';
+import demoNews from './demo-news.json';
 
 type Draft = Omit<Card, 'status' | 'chat'> & Partial<Pick<Card, 'status' | 'chat'>>;
 const card = (d: Draft): Card => ({ status: 'open', chat: [], ...d });
@@ -19,22 +20,28 @@ const NEWS_SLOTS: [string, string, number][] = [
   ['World · Health', 'Health story', 3],
 ];
 
+// The public demo (built with EXPO_PUBLIC_DEMO=1) shows 12 real cards from a Sync on
+// 2026-11-11 instead of placeholders. The app you sign into never uses them.
+const DEMO = process.env.EXPO_PUBLIC_DEMO === '1';
+
 const newsCards = (day: string): Card[] =>
-  NEWS_SLOTS.map(([tag, what, n], i) =>
-    card({
-      id: `news-${day}-${i + 1}`,
-      kind: 'news',
-      title: `[${what} — the headline pulled at Sync]`,
-      hook: `[Source] · ${7 + Math.floor(i / 4)}:${String((i * 13) % 60).padStart(2, '0')} AM`,
-      tag,
-      cta: 'Deep dive',
-      sources: n,
-      blocks: [
-        { type: 'text', text: `This is where the deep dive for the ${what.toLowerCase()} goes. Sync writes it ahead of time from all ${n} sources, so it opens even with the Mac off.` },
-        { type: 'callout', label: 'Covered by', text: `${n} sources. Duplicates are merged before you ever see them.` },
-      ],
-    }),
-  );
+  DEMO
+    ? (demoNews as Omit<Draft, 'id' | 'kind'>[]).map((c, i) => card({ ...c, id: `news-${day}-${i + 1}`, kind: 'news' }))
+    : NEWS_SLOTS.map(([tag, what, n], i) =>
+      card({
+        id: `news-${day}-${i + 1}`,
+        kind: 'news',
+        title: `[${what} — the headline pulled at Sync]`,
+        hook: `[Source] · ${7 + Math.floor(i / 4)}:${String((i * 13) % 60).padStart(2, '0')} AM`,
+        tag,
+        cta: 'Deep dive',
+        sources: n,
+        blocks: [
+          { type: 'text', text: `This is where the deep dive for the ${what.toLowerCase()} goes. Sync writes it ahead of time from all ${n} sources, so it opens even with the Mac off.` },
+          { type: 'callout', label: 'Covered by', text: `${n} sources. Duplicates are merged before you ever see them.` },
+        ],
+      }),
+    );
 
 const coding1: Block[] = [
   { type: 'text', text: "A computer can't guess what you mean. It reads your instructions one line at a time, top to bottom, and does exactly what each line says." },

@@ -85,6 +85,10 @@ The connector: `cd supabase/functions/mcp && deno test -A` (fake database, never
 
 The free project pauses after 7 days without use; restore it from the dashboard with one click.
 
+## Public demo
+
+`https://endgame-silk.vercel.app` is the web build in demo mode: no Supabase, no helper, and 12 real news cards from `app/src/data/demo-news.json` in place of the placeholders. `app/vercel.json` builds it with `EXPO_NO_DOTENV=1 EXPO_PUBLIC_DEMO=1`, so your `.env.local` is never used, and `.vercelignore` keeps it from being uploaded. Redeploy from `app/` with `npx vercel deploy --prod --scope satwik22`.
+
 ## Mac helper (worker)
 
 Runs in the background on the Mac, signs in as you (so row-level security applies), and does the jobs the app asks for. Claude runs through `claude -p` on the Max plan; `ANTHROPIC_API_KEY` is stripped so it can never bill the API.

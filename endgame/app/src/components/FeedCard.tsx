@@ -129,12 +129,12 @@ export function FeedCard({ card, index, pageH, scrollY, newsLeft, showHint, onOp
             {card.kind === 'news' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
                 <View style={{ flexDirection: 'row' }}>
-                  {t.dots.map((c, i) => (
+                  {t.dots.slice(0, Math.min(card.sources ?? 1, t.dots.length)).map((c, i) => (
                     <View key={c} style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: c, marginLeft: i ? -6 : 0, borderWidth: 2, borderColor: t.card }} />
                   ))}
                 </View>
                 <T size={13} color={t.muted}>
-                  Covered by {card.sources ?? 1} sources
+                  Covered by {card.sources ?? 1} {(card.sources ?? 1) === 1 ? 'source' : 'sources'}
                 </T>
               </View>
             )}
