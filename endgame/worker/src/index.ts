@@ -2,7 +2,7 @@
 // the jobs the phone asks for: Sync (build a day) and chat replies. Claude runs
 // through `claude -p` on your Max plan; see claude.ts.
 import { answerChat } from './chat.ts';
-import { connect, type Db } from './db.ts';
+import { connect, ensureSession, type Db } from './db.ts';
 import { finishLesson, writeLesson } from './lessons/lesson.ts';
 import { ensureCourse, regenerate } from './lessons/syllabus.ts';
 import { syncDay, targetDay } from './sync.ts';
@@ -18,6 +18,7 @@ type Job = { id: string; type: 'sync' | 'chat' | 'lesson' | 'condense'; payload:
 let busy: string | null = null;
 
 async function heartbeat(db: Db) {
+  if (!(await signedIn(db))) return;
   const { error } = await db.sb
     .from('helper_status')
     .upsert({ user_id: db.userId, last_seen: new Date().toISOString(), version: VERSION, busy });
@@ -85,10 +86,38 @@ async function enqueue(db: Db, job: Job) {
   draining = false;
 }
 
+/** Logs only when the sign-in state changes, so a night offline doesn't fill the log. */
+let wasSignedIn = true;
+async function signedIn(db: Db) {
+  const ok = await ensureSession(db).catch(() => false);
+  if (ok !== wasSignedIn) log(ok ? 'signed in again' : 'not signed in (offline?); retrying');
+  wasSignedIn = ok;
+  return ok;
+}
+
 async function pollQueued(db: Db) {
+  if (!(await signedIn(db))) return;
   const { data, error } = await db.sb.from('jobs').select('*').eq('status', 'queued').order('created_at');
   if (error) return log(`poll failed: ${error.message}`);
   for (const j of data ?? []) enqueue(db, j as Job);
+}
+
+/** New jobs arrive through Realtime; if the channel drops (sleep, network), it reconnects. */
+function listen(db: Db) {
+  let retry: ReturnType<typeof setTimeout> | null = null;
+  const channel = db.sb
+    .channel('jobs')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs', filter: `user_id=eq.${db.userId}` }, (p) => enqueue(db, p.new as Job))
+    .subscribe((status) => {
+      log(`realtime: ${status}`);
+      if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') && !retry) {
+        retry = setTimeout(async () => {
+          await db.sb.removeChannel(channel).catch(() => {});
+          await signedIn(db);
+          listen(db);
+        }, 15_000);
+      }
+    });
 }
 
 async function daemon() {
@@ -96,10 +125,7 @@ async function daemon() {
   log(`Endgame helper ${VERSION} signed in; listening for jobs`);
   await heartbeat(db);
   setInterval(() => heartbeat(db), HEARTBEAT_MS);
-  db.sb
-    .channel('jobs')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs', filter: `user_id=eq.${db.userId}` }, (p) => enqueue(db, p.new as Job))
-    .subscribe((status) => log(`realtime: ${status}`));
+  listen(db);
   // Realtime can miss events while the Mac sleeps; polling catches up.
   await pollQueued(db);
   setInterval(() => pollQueued(db), POLL_MS);

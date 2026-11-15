@@ -22,6 +22,23 @@ export async function connect(): Promise<Db> {
   return { sb, userId: data.user.id };
 }
 
+/**
+ * Keeps the helper signed in across sleep. The automatic refresh can miss its moment while
+ * the Mac is asleep or offline, and then every request quietly runs as nobody (RLS refuses
+ * writes and reads come back empty). Renews early, and signs in again if renewing fails.
+ */
+export async function ensureSession(db: Db): Promise<boolean> {
+  const { data } = await db.sb.auth.getSession();
+  const left = data.session?.expires_at ? data.session.expires_at * 1000 - Date.now() : -1;
+  if (left > 5 * 60_000) return true;
+  if (data.session) {
+    const r = await db.sb.auth.refreshSession();
+    if (!r.error && r.data.session) return true;
+  }
+  const s = await db.sb.auth.signInWithPassword({ email: need('ENDGAME_EMAIL'), password: need('ENDGAME_PASSWORD') });
+  return !s.error && !!s.data.session;
+}
+
 async function rowsFor(db: Db, days: string[]): Promise<S.Rows> {
   if (!days.length) return { days: [], cards: [], chats: [] };
   const [d, c] = await Promise.all([
@@ -49,14 +66,18 @@ export async function loadPrev(db: Db, day: string): Promise<DayFeed | null> {
 /** Replaces a day on the server: upserts its cards and removes cards no longer in it. Chat is untouched. */
 export async function saveDay(db: Db, feed: DayFeed) {
   const rows = S.toRows({ [feed.day]: feed }, db.userId);
-  const d = await db.sb.from('days').upsert(rows.days);
-  if (d.error) throw d.error;
+  // The day row must exist for its cards, but it only becomes the new build (source, built_at)
+  // once the cards are in place, so a phone syncing mid-way never takes old cards for new.
+  const d0 = await db.sb.from('days').upsert(rows.days, { ignoreDuplicates: true });
+  if (d0.error) throw d0.error;
   const c = await db.sb.from('cards').upsert(rows.cards);
   if (c.error) throw c.error;
   const keep = rows.cards.map((r) => r.id);
   const del = db.sb.from('cards').delete().eq('day', feed.day);
   const res = keep.length ? await del.not('id', 'in', `(${keep.map((k) => `"${k}"`).join(',')})`) : await del;
   if (res.error) throw res.error;
+  const d = await db.sb.from('days').upsert(rows.days);
+  if (d.error) throw d.error;
 }
 
 export async function loadCourse(db: Db, course: CourseId): Promise<Course | null> {

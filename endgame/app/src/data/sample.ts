@@ -213,3 +213,21 @@ export function seedYesterday(day: string): DayFeed {
     ],
   };
 }
+
+/** Placeholder news from the sample day ("[Top US story — …]"). */
+const isPlaceholder = (c: Card) => /^\[.*\]$/.test(c.title);
+
+/**
+ * Removes sample cards a device saved before this fix: placeholders anywhere, and sample
+ * ids on days the app built itself (a Sync-built day can share an id, e.g. a carried drill).
+ */
+export function stripSamples(feeds: Record<string, DayFeed>): Record<string, DayFeed> {
+  const out: Record<string, DayFeed> = {};
+  for (const [d, f] of Object.entries(feeds)) {
+    const sample = f.source === 'sync' ? new Set<string>() : new Set([...freshCards(d), ...seedYesterday(d).cards].map((c) => c.id));
+    const cards = f.cards.filter((c) => !isPlaceholder(c) && !sample.has(c.id));
+    if (cards.length === f.cards.length) out[d] = f;
+    else if (cards.length || f.source === 'sync') out[d] = { ...f, cards };
+  }
+  return out;
+}

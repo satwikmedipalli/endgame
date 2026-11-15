@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.satwik.endgame"
+      "bundleIdentifier": "com.satwik.endgame",
+      "appleTeamId": "KKXDK67M3K"
     },
     "android": {
       "adaptiveIcon": {

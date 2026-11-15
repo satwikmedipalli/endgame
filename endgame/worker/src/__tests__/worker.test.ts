@@ -131,6 +131,14 @@ describe('re-running Sync on a started day', () => {
     assert.equal(out.cards[1].openedAt, 'y');
   });
 
+  it('replaces a day the phone built: skipped placeholders go, a carried card keeps its state', () => {
+    const existing: DayFeed = { day: '2026-10-23', builtAt: '', cards: [card('[placeholder]', { status: 'skip' }), card('chess-drill-3', { kind: 'chess', openedAt: 'x' })] };
+    const built = feed([card('n-new'), card('chess-drill-3', { kind: 'chess' })]);
+    const out = mergeRebuild(built, existing);
+    assert.deepEqual(out.cards.map((c) => c.id), ['n-new', 'chess-drill-3']);
+    assert.equal(out.cards[1].openedAt, 'x');
+  });
+
   it('a first build is used as is', () => {
     const built = feed([card('a')]);
     assert.equal(mergeRebuild(built, null), built);

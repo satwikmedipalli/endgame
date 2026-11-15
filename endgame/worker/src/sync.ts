@@ -37,9 +37,12 @@ export function mergeRebuild(built: DayFeed, existing: DayFeed | null): DayFeed 
     const kept = !c.blocks.length && o.blocks.length ? { ...c, blocks: o.blocks } : c;
     return touched(o) ? { ...kept, status: o.status, openedAt: o.openedAt, chat: o.chat, watch: o.watch, practice: o.practice } : kept;
   });
+  // A day the phone built before Sync holds nothing of its own (carry-overs, which Sync
+  // rebuilds, or old placeholders), so only Sync-built days keep cards the new build dropped.
   const ids = new Set(cards.map((c) => c.id));
-  const keptNews = existing.cards.filter((c) => !ids.has(c.id) && touched(c) && c.kind === 'news');
-  const keptOther = existing.cards.filter((c) => !ids.has(c.id) && touched(c) && c.kind !== 'news');
+  const extra = existing.source === 'sync' ? existing.cards.filter((c) => !ids.has(c.id) && touched(c)) : [];
+  const keptNews = extra.filter((c) => c.kind === 'news');
+  const keptOther = extra.filter((c) => c.kind !== 'news');
   const firstOther = cards.findIndex((c) => c.kind !== 'news');
   const at = firstOther >= 0 ? firstOther : cards.length;
   return { ...built, cards: [...cards.slice(0, at), ...keptNews, ...cards.slice(at), ...keptOther] };

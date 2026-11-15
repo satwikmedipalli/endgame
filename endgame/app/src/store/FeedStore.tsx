@@ -3,7 +3,7 @@ import { randomUUID } from 'expo-crypto';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
-import { freshCards, seedYesterday } from '@/data/sample';
+import { freshCards, seedYesterday, stripSamples } from '@/data/sample';
 import * as F from '@/lib/feed';
 import { supabase } from '@/lib/supabase';
 import * as S from '@/lib/sync';
@@ -53,14 +53,18 @@ function withChatIds(feeds: Record<string, DayFeed>) {
   return feeds;
 }
 
-/** Adds today (and a sample yesterday on a brand-new install) without touching existing days. */
+// Without Supabase the app is a demo and fills days with sample cards. Signed in, it never
+// does: a day Sync hasn't built yet holds only real carry-overs until Sync replaces it.
+const demo = !supabase;
+
+/** Adds today (and, in the demo, a sample yesterday on a brand-new install) without touching existing days. */
 function withToday(feeds: Record<string, DayFeed>, today: string) {
   let next = feeds;
-  if (Object.keys(next).length === 0) {
+  if (demo && Object.keys(next).length === 0) {
     const y = F.prevDay(today);
     next = { [y]: seedYesterday(y) };
   }
-  if (!next[today]) return { ...next, [today]: F.ensureDay(next, today, freshCards(today)) };
+  if (!next[today]) return { ...next, [today]: F.ensureDay(next, today, demo ? freshCards(today) : []) };
   const prev = Object.keys(next).filter((d) => d < today).sort().pop();
   const topped = F.addCarryOvers(next[today], prev ? next[prev] : null);
   return topped === next[today] ? next : { ...next, [today]: topped };
@@ -134,7 +138,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       const remote = S.fromRows(rows);
       // What the server already has doesn't need sending again.
       snap.current = S.snapshot(S.toRows(remote, userId));
-      setFeeds((local) => withToday(S.mergeFeeds(local, remote), F.dayKey(new Date())));
+      setFeeds((local) => withToday(demo ? S.mergeFeeds(local, remote) : stripSamples(S.mergeFeeds(local, remote)), F.dayKey(new Date())));
       setSync({ status: 'synced', at: new Date().toISOString() });
     } catch (e) {
       setSync({ status: 'offline', error: (e as Error).message });
@@ -151,7 +155,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       .catch(() => ({}))
       .then((stored) => {
         loaded.current = true;
-        setFeeds(withToday(withChatIds(stored), F.dayKey(new Date())));
+        setFeeds(withToday(demo ? withChatIds(stored) : stripSamples(withChatIds(stored)), F.dayKey(new Date())));
         setReady(true);
       });
   }, []);
@@ -229,7 +233,8 @@ export function FeedProvider({ children }: { children: ReactNode }) {
         }),
       autoSkipBefore: (i) => edit((f) => F.autoSkipNewsBefore(f, i)),
       clearNews: () => edit(F.clearAllNews),
-      rebuild: () => setFeeds((f) => ({ ...f, [day]: F.ensureDay(f, day, freshCards(day), { force: true }) })),
+      // Signed in, today's cards come from Sync; rebuilding just re-reads the server copy.
+      rebuild: () => (demo ? setFeeds((f) => ({ ...f, [day]: F.ensureDay(f, day, freshCards(day), { force: true }) })) : pullAndMerge().then(pushNow)),
       resetAll: async () => {
         // Clear the server copy too, or the next merge would bring it all back.
         if (supabase && userId) {

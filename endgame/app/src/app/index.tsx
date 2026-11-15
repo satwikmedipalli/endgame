@@ -10,8 +10,10 @@ import { FeedCard } from '@/components/FeedCard';
 import { FeedHeader } from '@/components/FeedHeader';
 import { useFeedCss } from '@/components/feedMotion';
 import { Icon } from '@/components/Icon';
+import { SyncControl } from '@/components/SyncControl';
 import { Dot, Serif, T } from '@/components/ui';
 import { progress } from '@/lib/feed';
+import { supabase } from '@/lib/supabase';
 import { takeAdvance } from '@/store/nav';
 import { useFeed } from '@/store/FeedStore';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -60,7 +62,9 @@ export default function Feed() {
   );
 
   const stats = today ? progress(today) : null;
-  const finished = !!stats?.finished;
+  // Signed in, a day Sync hasn't built yet only has carry-overs; it isn't "done".
+  const unbuilt = !!supabase && !!today && today.source !== 'sync';
+  const finished = !!stats?.finished && !unbuilt;
 
   // Show the end screen a beat after the last card is cleared.
   useEffect(() => {
@@ -91,6 +95,15 @@ export default function Feed() {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: insets.top }}>
       <FeedHeader feed={today} current={current} />
+      {unbuilt && (
+        <View style={{ marginHorizontal: 16, marginBottom: 8, padding: 16, gap: 10, borderRadius: 18, backgroundColor: t.card, borderWidth: 1, borderColor: t.cardLine }}>
+          <Serif size={24}>Today isn&apos;t built yet.</Serif>
+          <T size={14} color={t.muted} style={{ lineHeight: 20 }}>
+            Sync on your Mac writes today&apos;s news and lessons in about two minutes.{today.cards.length ? ' Below is what carried over from yesterday.' : ''}
+          </T>
+          <SyncControl day={today.day} label="Build today" />
+        </View>
+      )}
       <View style={{ flex: 1 }} onLayout={(e: LayoutChangeEvent) => setPageH(Math.round(e.nativeEvent.layout.height))}>
         {pageH > 0 && (
           <Animated.ScrollView
