@@ -85,6 +85,17 @@ The connector: `cd supabase/functions/mcp && deno test -A` (fake database, never
 
 The free project pauses after 7 days without use; restore it from the dashboard with one click.
 
+## Install on the iPhone (AltStore)
+
+No paid Apple Developer account: AltStore installs the app with a free Apple ID and re-signs it every few days so it never expires.
+
+1. `app/scripts/build-ipa.sh` builds `~/endgame/builds/Endgame-<version>.ipa` (unsigned; AltStore signs it).
+2. One time: AltServer (`brew install --cask altserver`) runs in the Mac menu bar. With the iPhone plugged in: AltServer → Install AltStore → your iPhone, sign in with your Apple ID. On the phone: Settings → General → VPN & Device Management → trust your Apple ID, and turn on Developer Mode (Settings → Privacy & Security).
+3. AirDrop the .ipa to the phone, open it with AltStore (or AltStore → My Apps → +).
+4. AltStore refreshes the app in the background whenever the phone and the Mac (AltServer running) are on the same Wi-Fi. Open AltStore once a week if you've been away; if 7 days pass without a refresh the app won't open until it refreshes, but nothing is lost (your data is in Supabase).
+
+After an app change, rebuild and install the new .ipa the same way; it replaces the old one and keeps your login.
+
 ## Public demo
 
 `https://endgame-silk.vercel.app` is the web build in demo mode: no Supabase, no helper, and 12 real news cards from `app/src/data/demo-news.json` in place of the placeholders. `app/vercel.json` builds it with `EXPO_NO_DOTENV=1 EXPO_PUBLIC_DEMO=1`, so your `.env.local` is never used, and `.vercelignore` keeps it from being uploaded. Redeploy from `app/` with `npx vercel deploy --prod --scope satwik22`.
