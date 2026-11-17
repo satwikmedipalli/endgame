@@ -1,6 +1,6 @@
-import { parseBlocks } from '../../../app/src/lib/blocks.ts';
-import { HOME } from '../../../app/src/lib/sun.ts';
-import type { Block, Card } from '../../../app/src/lib/types.ts';
+import { parseBlocks } from '../../../shared/blocks.ts';
+import { HOME } from '../../../shared/sun.ts';
+import type { Block, Card } from '../../../shared/types.ts';
 import { cluster, hashKey, similarity, tokens } from './cluster.ts';
 import { fetchAll } from './rss.ts';
 import { QUOTA, SOURCES, type Region } from './sources.ts';

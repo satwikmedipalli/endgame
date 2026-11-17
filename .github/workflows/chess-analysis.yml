@@ -2,7 +2,7 @@
 # ones and saves the report the chess course is built from. No Claude involved.
 # Secrets (Settings → Secrets and variables → Actions): SUPABASE_URL, SUPABASE_KEY
 # (the publishable key), ENDGAME_EMAIL, ENDGAME_PASSWORD. It signs in as you, so
-# row-level security applies exactly as on the phone.
+# row-level security applies exactly as in the app.
 name: Weekly chess analysis
 
 on:
@@ -19,14 +19,14 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
-        working-directory: endgame/worker
+        working-directory: endgame
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: endgame/worker/package-lock.json
+          cache-dependency-path: endgame/package-lock.json
       - name: Install Stockfish 19
         run: |
           curl -fsSL -o /tmp/sf.tgz https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-x86-64-universal.tar.gz
@@ -34,8 +34,9 @@ jobs:
           bin=$(find /tmp/sf -type f -name 'stockfish*' -perm -u+x | head -1)
           printf 'uci\nquit\n' | "$bin" | grep '^id name'
           echo "STOCKFISH_BIN=$bin" >> "$GITHUB_ENV"
-      - run: npm ci
-      - run: npm run chess-analysis
+      # The repo is one npm workspace; only the helper's packages are needed here.
+      - run: npm ci -w worker
+      - run: npm run chess-analysis -w worker
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

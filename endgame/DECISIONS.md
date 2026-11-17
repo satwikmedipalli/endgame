@@ -8,7 +8,7 @@ Short log of choices and why. Newest at the bottom of each section.
 - **Manual Sync, not a cron.** Sync writes the news and adds teaser cards; lessons, stories and pitches are written only when you open a card (your choice, to save usage), so opening one needs the Mac on. Chat needs the Mac awake too.
 - **Mac off → "Discuss in Claude"** through a custom connector (MCP server on Supabase), one Claude project per course.
 - **Weekly Stockfish analysis stays in a GitHub Action.** It needs no Claude.
-- **No $99 Apple Developer Program.** Free Apple ID sideload, refreshed by AltStore; OTA updates via EAS Update.
+- **No $99 Apple Developer Program.** (Milestone 9 replaced the iPhone app with a Mac app, signed ad hoc and built on the Mac it runs on.)
 
 ## Milestone 1 (app + dummy data)
 - **Expo SDK 58 + Expo Router + TypeScript.** One codebase for the iPhone app and the review website (Expo web).
@@ -105,3 +105,18 @@ Short log of choices and why. Newest at the bottom of each section.
 - **An unwritten lesson is taught by Claude itself** from the title, hook and course goal and style, since the Mac (which writes lessons) is off.
 - **The text of a card is shared** (`app/src/lib/cardText.ts`) by the Mac's chat and the connector. The deploy bundler can't follow the app's extensionless imports, so the connector imports only files with none.
 - **Projects can't be opened with a prompt filled in**, so with a project link the prompt is copied to the clipboard; without one a new chat opens with it filled in. Claude names its own chats; starting the prompt with the card title makes it name them after the card most of the time.
+
+## Milestone 9 (the Mac app)
+- **The iPhone app is retired; Endgame is a Mac app.** The Expo project, the .ipa build script, AltStore and the launchd service are gone. Supabase stays, because the Claude connector and the weekly chess Action read and write it.
+- **Electron, not a SwiftUI rewrite.** All the logic was already TypeScript, and it carries over unchanged (`shared/`, moved out of `app/src/lib`). The window is React for the DOM rather than React Native for Web, so it gets real inputs, keyboard handling and CSS transitions. Every dependency is bundled (Vite for the window, esbuild for the main process), so the packaged app needs no node_modules.
+- **The helper runs inside the app.** The main process starts the same helper code that used to run under launchd (`worker/src/helper.ts`, now an exported `startHelper`). Jobs still go through the `jobs` table instead of a direct call, so a question asked from the window, the menu bar or another device all work the same way. Closing the window keeps the app (and the helper) in the menu bar; ⌘Q stops both.
+- **One settings file for the window and the helper**: `~/Library/Application Support/Endgame/endgame.env`, chmod 600, imported from `worker/.env` on first launch. The window signs in with the same email and password, so there's no separate sign-in screen. Changing the settings restarts the app so the helper picks them up.
+- **PATH comes from a login shell.** Apps opened from the Dock get a bare PATH, so `claude` wasn't found; the main process asks the login shell once and adds the usual install folders.
+- **Newsprint, chosen from five layouts and four colour themes on the design canvas.** One ink on newsprint grey, rules instead of boxes, red only for the lead story. Light from sunrise to sunset, dark after, as before.
+- **A front page instead of a swipe feed.** All of the day is visible at once: the lead (the first story still open), six top stories, more news in columns, then lessons, also-today and puzzles. Scrolling past news no longer counts as Skip; "Clear all news" does it on purpose.
+- **Stories open as paper.** A sheet slides up over the front page with the next two pages stacked underneath; turning a page slides it off to the side. Only the current page and its neighbours are drawn. Done and Skip move to the next open card; when none are left the paper goes away and the end screen arrives.
+- **The icon follows the sun too.** An italic E with a red full stop between newspaper rules: white by day, ink at night. The Dock icon is swapped at runtime (macOS allows only one icon in Finder, so that one is the day version).
+- **Puzzles are a new card kind (`puzzle`).** The sudoku is made entirely in code: a random full grid, then symmetric pairs removed while the solution stays unique (checked by a solver). Same day, same puzzle; Easy early in the week, Hard at the weekend.
+- **The crossword grid is filled in code, never by the model**, the same rule as chess positions. A small backtracking filler places everyday words (a hand-made list of ~2,200) into a 5×5 layout, or 4×4 if that fails; Haiku only writes the clues, and a clue that contains its answer is refused. Denser 5×5 layouts need a bigger word list than ours, so only the layouts that fill reliably are used. Answers from the last ~60 grids are kept out.
+- **Puzzle progress is stored on the card** (`content.puzzle.entries`), so it syncs like everything else and survives quitting. Puzzles don't carry over to the next day.
+- **One npm workspace** (`shared`, `worker`, `mac`) so `chess.js` and friends resolve for all three; the chess Action installs only the helper's packages (`npm ci -w worker`).

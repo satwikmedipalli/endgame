@@ -1,0 +1,151 @@
+// The Endgame helper: signs in as you and runs the jobs the app asks for (Sync, lessons,
+// chat replies, course notes). Claude runs through `claude -p` on your plan; see claude.ts.
+// The Mac app starts it inside itself; `npm start` runs it on its own in a terminal.
+import { answerChat } from './chat.ts';
+import { connect, ensureSession, type Db } from './db.ts';
+import { finishLesson, writeLesson } from './lessons/lesson.ts';
+import { syncDay } from './sync.ts';
+
+const VERSION = '0.5.0';
+const HEARTBEAT_MS = 30_000;
+const POLL_MS = 20_000;
+
+let sink: (line: string) => void = (line) => console.log(line);
+const log = (m: string) => sink(`${new Date().toLocaleTimeString('en-US', { hour12: false })} ${m}`);
+
+type Job = { id: string; type: 'sync' | 'chat' | 'lesson' | 'condense'; payload: any; status: string; created_at: string };
+
+let busy: string | null = null;
+
+async function heartbeat(db: Db) {
+  if (!(await signedIn(db))) return;
+  const { error } = await db.sb
+    .from('helper_status')
+    .upsert({ user_id: db.userId, last_seen: new Date().toISOString(), version: VERSION, busy });
+  if (error) log(`heartbeat failed: ${error.message}`);
+}
+
+async function progress(db: Db, id: string, stage: string) {
+  log(`  ${stage}`);
+  busy = stage;
+  await db.sb.from('jobs').update({ result: { stage }, updated_at: new Date().toISOString() }).eq('id', id);
+  await heartbeat(db);
+}
+
+/** Claims a queued job (only one helper can win the update) and runs it. */
+async function runJob(db: Db, job: Job) {
+  const { data } = await db.sb
+    .from('jobs')
+    .update({ status: 'running', updated_at: new Date().toISOString() })
+    .eq('id', job.id)
+    .eq('status', 'queued')
+    .select('id');
+  if (!data?.length) return;
+  log(`job ${job.type} ${job.id.slice(0, 8)}`);
+  try {
+    let result: object;
+    if (job.type === 'sync') {
+      busy = 'Syncing';
+      await heartbeat(db);
+      result = await syncDay(db, { day: job.payload?.day }, (m) => progress(db, job.id, m));
+    } else if (job.type === 'chat') {
+      busy = 'Answering';
+      await heartbeat(db);
+      result = await answerChat(db, job.payload);
+    } else if (job.type === 'lesson') {
+      result = await writeLesson(db, job.payload, (m) => progress(db, job.id, m));
+    } else if (job.type === 'condense') {
+      busy = 'Saving course notes';
+      await heartbeat(db);
+      result = await finishLesson(db, job.payload);
+    } else throw new Error(`unknown job type ${job.type}`);
+    await db.sb.from('jobs').update({ status: 'done', result, updated_at: new Date().toISOString() }).eq('id', job.id);
+    log(`job done`);
+  } catch (e) {
+    const msg = (e as Error).message;
+    log(`job failed: ${msg}`);
+    await db.sb.from('jobs').update({ status: 'failed', error: msg.slice(0, 500), updated_at: new Date().toISOString() }).eq('id', job.id);
+  } finally {
+    busy = null;
+    await heartbeat(db);
+  }
+}
+
+// Jobs run one at a time: chat first, then lessons you're waiting on, then the rest,
+// so a question never waits behind a long Sync.
+const PRIORITY: Record<Job['type'], number> = { chat: 0, lesson: 1, condense: 2, sync: 3 };
+const queue: Job[] = [];
+let draining = false;
+async function enqueue(db: Db, job: Job) {
+  if (queue.some((j) => j.id === job.id)) return;
+  queue.push(job);
+  queue.sort((a, b) => PRIORITY[a.type] - PRIORITY[b.type] || a.created_at.localeCompare(b.created_at));
+  if (draining) return;
+  draining = true;
+  while (queue.length) await runJob(db, queue.shift()!);
+  draining = false;
+}
+
+/** Logs only when the sign-in state changes, so a night offline doesn't fill the log. */
+let wasSignedIn = true;
+async function signedIn(db: Db) {
+  const ok = await ensureSession(db).catch(() => false);
+  if (ok !== wasSignedIn) log(ok ? 'signed in again' : 'not signed in (offline?); retrying');
+  wasSignedIn = ok;
+  return ok;
+}
+
+async function pollQueued(db: Db) {
+  if (!(await signedIn(db))) return;
+  const { data, error } = await db.sb.from('jobs').select('*').eq('status', 'queued').order('created_at');
+  if (error) return log(`poll failed: ${error.message}`);
+  for (const j of data ?? []) enqueue(db, j as Job);
+}
+
+/** New jobs arrive through Realtime; if the channel drops (sleep, network), it reconnects. */
+function listen(db: Db) {
+  let retry: ReturnType<typeof setTimeout> | null = null;
+  const channel = db.sb
+    .channel('jobs')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs', filter: `user_id=eq.${db.userId}` }, (p) => enqueue(db, p.new as Job))
+    .subscribe((status) => {
+      log(`realtime: ${status}`);
+      if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') && !retry) {
+        retry = setTimeout(async () => {
+          await db.sb.removeChannel(channel).catch(() => {});
+          await signedIn(db);
+          listen(db);
+        }, 15_000);
+      }
+    });
+}
+
+export type Helper = {
+  db: Db;
+  /** Queues a Sync job, exactly as the app's Sync button does. */
+  requestSync: (day?: string) => Promise<void>;
+  /** What the helper is doing right now (null when idle). */
+  busy: () => string | null;
+};
+
+/** Signs in, then listens for jobs (Realtime plus a 20-second poll) until the process ends. */
+export async function startHelper(opts: { log?: (line: string) => void } = {}): Promise<Helper> {
+  if (opts.log) sink = opts.log;
+  const db = await connect();
+  log(`Endgame helper ${VERSION} signed in; listening for jobs`);
+  await heartbeat(db);
+  setInterval(() => heartbeat(db), HEARTBEAT_MS);
+  listen(db);
+  // Realtime can miss events while the Mac sleeps; polling catches up.
+  await pollQueued(db);
+  setInterval(() => pollQueued(db), POLL_MS);
+  return {
+    db,
+    busy: () => busy,
+    requestSync: async (day) => {
+      if (!(await signedIn(db))) throw new Error('not signed in');
+      const { error } = await db.sb.from('jobs').insert({ type: 'sync', payload: day ? { day } : {}, user_id: db.userId });
+      if (error) throw error;
+    },
+  };
+}

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { flattenSyllabus, topicCard } from '../../../app/src/lib/course.ts';
-import type { Card, DayFeed } from '../../../app/src/lib/types.ts';
-import { blocksToText } from '../../../app/src/lib/cardText.ts';
+import { flattenSyllabus, topicCard } from '../../../shared/course.ts';
+import type { Card, DayFeed } from '../../../shared/types.ts';
+import { blocksToText } from '../../../shared/cardText.ts';
 import { chatPrompt } from '../chat.ts';
 import type { Reaction } from '../db.ts';
 import { historyCard } from '../discover/history.ts';

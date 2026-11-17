@@ -1,7 +1,7 @@
 // What the Claude app sees: each tool's answer as plain Markdown. Pure.
-import { blocksToText, RULES } from '../../../app/src/lib/cardText.ts';
-import type { Course, CourseId } from '../../../app/src/lib/course.ts';
-import type { Card } from '../../../app/src/lib/types.ts';
+import { blocksToText, RULES } from '../../../shared/cardText.ts';
+import type { Course, CourseId } from '../../../shared/course.ts';
+import type { Card } from '../../../shared/types.ts';
 import { COURSES } from '../../../worker/src/lessons/info.ts';
 
 const COURSE_NAMES: Record<string, string> = { code: 'Coding', stocks: 'Stock market', chess: 'Chess', italian: 'Italian' };
@@ -13,6 +13,7 @@ const KIND_NAMES: Record<Card['kind'], string> = {
   chess: 'Chess',
   italian: 'Italian',
   watch: 'Watch',
+  puzzle: 'Puzzle',
 };
 
 const STATUS: Record<Card['status'], string> = { open: 'not done', done: 'DONE', skip: 'skipped' };

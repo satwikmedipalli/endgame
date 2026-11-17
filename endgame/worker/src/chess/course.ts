@@ -1,8 +1,8 @@
 import { Chess } from 'chess.js';
 
-import type { Course, Topic } from '../../../app/src/lib/course.ts';
-import { parseBlocks } from '../../../app/src/lib/blocks.ts';
-import type { Block, Card } from '../../../app/src/lib/types.ts';
+import type { Course, Topic } from '../../../shared/course.ts';
+import { parseBlocks } from '../../../shared/blocks.ts';
+import type { Block, Card } from '../../../shared/types.ts';
 import { ask } from '../claude.ts';
 import type { Db } from '../db.ts';
 import { makeDrills, type DrillKind } from './drills.ts';

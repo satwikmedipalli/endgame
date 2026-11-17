@@ -1,8 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-import { pointerOf, type Course, type CourseId } from '../../app/src/lib/course.ts';
-import * as S from '../../app/src/lib/sync.ts';
-import type { Block, Card, DayFeed } from '../../app/src/lib/types.ts';
+import { pointerOf, type Course, type CourseId } from '../../shared/course.ts';
+import * as S from '../../shared/sync.ts';
+import type { Block, Card, DayFeed } from '../../shared/types.ts';
 
 export type Db = { sb: SupabaseClient; userId: string };
 
@@ -12,7 +12,7 @@ function need(name: string): string {
   return v;
 }
 
-/** Signs in as you, so the helper is bound by the same row-level security as the phone. */
+/** Signs in as you, so the helper is bound by the same row-level security as the app. */
 export async function connect(): Promise<Db> {
   const sb = createClient(need('SUPABASE_URL'), need('SUPABASE_KEY'), {
     auth: { persistSession: false, autoRefreshToken: true },
@@ -67,7 +67,7 @@ export async function loadPrev(db: Db, day: string): Promise<DayFeed | null> {
 export async function saveDay(db: Db, feed: DayFeed) {
   const rows = S.toRows({ [feed.day]: feed }, db.userId);
   // The day row must exist for its cards, but it only becomes the new build (source, built_at)
-  // once the cards are in place, so a phone syncing mid-way never takes old cards for new.
+  // once the cards are in place, so the app syncing mid-way never takes old cards for new.
   const d0 = await db.sb.from('days').upsert(rows.days, { ignoreDuplicates: true });
   if (d0.error) throw d0.error;
   const c = await db.sb.from('cards').upsert(rows.cards);

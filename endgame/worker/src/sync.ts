@@ -1,9 +1,10 @@
-import { cardIdOf, LESSON_COURSES, LESSONS_PER_DAY, nextTopics, topicCard, topicIdOf } from '../../app/src/lib/course.ts';
-import { buildDay, carryOverCards, dayKey } from '../../app/src/lib/feed.ts';
-import { HOME } from '../../app/src/lib/sun.ts';
-import type { Card, DayFeed } from '../../app/src/lib/types.ts';
+import { cardIdOf, LESSON_COURSES, LESSONS_PER_DAY, nextTopics, topicCard, topicIdOf } from '../../shared/course.ts';
+import { buildDay, carryOverCards, dayKey } from '../../shared/feed.ts';
+import { HOME } from '../../shared/sun.ts';
+import type { Card, DayFeed } from '../../shared/types.ts';
 import { loadCourse, loadDay, loadPrev, saveDay, type Db } from './db.ts';
 import { historyCards } from './discover/history.ts';
+import { puzzleCards } from './discover/puzzles.ts';
 import { saveRatings, watchCards } from './discover/watch.ts';
 import { finishLesson } from './lessons/lesson.ts';
 import { ensureCourse } from './lessons/syllabus.ts';
@@ -37,7 +38,7 @@ export function mergeRebuild(built: DayFeed, existing: DayFeed | null): DayFeed 
     const kept = !c.blocks.length && o.blocks.length ? { ...c, blocks: o.blocks } : c;
     return touched(o) ? { ...kept, status: o.status, openedAt: o.openedAt, chat: o.chat, watch: o.watch, practice: o.practice } : kept;
   });
-  // A day the phone built before Sync holds nothing of its own (carry-overs, which Sync
+  // A day the app built before Sync holds nothing of its own (carry-overs, which Sync
   // rebuilds, or old placeholders), so only Sync-built days keep cards the new build dropped.
   const ids = new Set(cards.map((c) => c.id));
   const extra = existing.source === 'sync' ? existing.cards.filter((c) => !ids.has(c.id) && touched(c)) : [];
@@ -98,12 +99,13 @@ export async function syncDay(db: Db, opts: { day?: string; lessonsOnly?: boolea
     ...(await lessonCards(db, day, prev, existing, log)),
     ...(await historyCards(db, day, existing, carryOverCards(prev), log)),
     ...(await watchCards(db, day, existing, log)),
+    ...(await puzzleCards(db, day, existing, log)),
   ];
   const now = new Date();
   const built = buildDay(day, [...news.cards, ...lessons], prev, now);
   const merged = mergeRebuild(
     { ...built, source: 'sync', cards: built.cards.map((c) => ({ ...c, updatedAt: now.toISOString() })) },
-    // A phone fallback day keeps your touched lessons but loses its placeholder news.
+    // An app fallback day keeps your touched lessons but loses its placeholder news.
     existing?.source === 'sync' ? existing : existing && { ...existing, cards: existing.cards.filter((c) => c.kind !== 'news') },
   );
   await saveDay(db, merged);

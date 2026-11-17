@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { NEW_WORD } from '../../../app/src/lib/srs.ts';
-import type { Card } from '../../../app/src/lib/types.ts';
+import { NEW_WORD } from '../../../shared/srs.ts';
+import type { Card } from '../../../shared/types.ts';
 import { applyGrades, learnedWords, reviewBlock } from '../lessons/italian.ts';
 
 const card = {

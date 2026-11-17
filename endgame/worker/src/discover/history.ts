@@ -1,4 +1,4 @@
-import type { Card, DayFeed } from '../../../app/src/lib/types.ts';
+import type { Card, DayFeed } from '../../../shared/types.ts';
 import { ask } from '../claude.ts';
 import { addSeen, loadReactions, loadSeen, type Db, type Seen } from '../db.ts';
 import { alreadySeen, describe, ERAS, pick, score, signal, slug, THEMES, type Scores } from './taste.ts';

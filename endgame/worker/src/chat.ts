@@ -1,6 +1,6 @@
-import { isLessonCourse } from '../../app/src/lib/course.ts';
-import { blocksToText, RULES } from '../../app/src/lib/cardText.ts';
-import type { Card } from '../../app/src/lib/types.ts';
+import { isLessonCourse } from '../../shared/course.ts';
+import { blocksToText, RULES } from '../../shared/cardText.ts';
+import type { Card } from '../../shared/types.ts';
 import { ask } from './claude.ts';
 import { loadCourse, loadDay, type Db } from './db.ts';
 

@@ -1,6 +1,6 @@
 import { Chess } from 'chess.js';
 
-import type { Block } from '../../../app/src/lib/types.ts';
+import type { Block } from '../../../shared/types.ts';
 import { numbered, type Played } from './lines.ts';
 
 // Notation drills made in code from positions in your own games: no Claude, so

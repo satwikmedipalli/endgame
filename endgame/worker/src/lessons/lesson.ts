@@ -1,7 +1,7 @@
-import { isLessonCourse, recordDone, topicIdOf, type Course } from '../../../app/src/lib/course.ts';
-import { fallbackBlocks, parseBlocks } from '../../../app/src/lib/blocks.ts';
-import type { Block, Card } from '../../../app/src/lib/types.ts';
-import { blocksToText } from '../../../app/src/lib/cardText.ts';
+import { isLessonCourse, recordDone, topicIdOf, type Course } from '../../../shared/course.ts';
+import { fallbackBlocks, parseBlocks } from '../../../shared/blocks.ts';
+import type { Block, Card } from '../../../shared/types.ts';
+import { blocksToText } from '../../../shared/cardText.ts';
 import { ask } from '../claude.ts';
 import { loadCourse, loadDay, saveBlocks, saveCourse, type Db } from '../db.ts';
 import { writeChessLesson } from '../chess/course.ts';

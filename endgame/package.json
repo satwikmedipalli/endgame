@@ -1,0 +1,15 @@
+{
+  "name": "endgame",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "worker",
+    "mac"
+  ],
+  "scripts": {
+    "app": "npm run dev -w mac",
+    "install-app": "npm run install-app -w mac",
+    "test": "npm test -ws --if-present",
+    "typecheck": "npm run typecheck -ws --if-present"
+  }
+}

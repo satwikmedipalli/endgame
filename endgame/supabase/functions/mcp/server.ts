@@ -2,10 +2,10 @@
 // responses) that lets the Claude app read Endgame cards and save a summary back.
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { Course } from '../../../app/src/lib/course.ts';
-import { HOME } from '../../../app/src/lib/sun.ts';
-import type { Card, ChatMessage } from '../../../app/src/lib/types.ts';
-import type { CardRow, ChatRow } from '../../../app/src/lib/sync.ts';
+import type { Course } from '../../../shared/course.ts';
+import { HOME } from '../../../shared/sun.ts';
+import type { Card, ChatMessage } from '../../../shared/types.ts';
+import type { CardRow, ChatRow } from '../../../shared/sync.ts';
 import { cardDoc, courseDoc, SUMMARY_MAX, summaryText, todayDoc } from './docs.ts';
 
 // Same calendar day as the app's dayKey (feed.ts), which the deploy bundler can't import.

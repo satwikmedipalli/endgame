@@ -1,5 +1,5 @@
-import { addDays, NEW_WORD, review, wordId, type Grade, type WordState } from '../../../app/src/lib/srs.ts';
-import type { Block, Card } from '../../../app/src/lib/types.ts';
+import { addDays, NEW_WORD, review, wordId, type Grade, type WordState } from '../../../shared/srs.ts';
+import type { Block, Card } from '../../../shared/types.ts';
 import type { Db } from '../db.ts';
 
 // Italian: each card is a word review (words due today, scheduled with SM-2), then

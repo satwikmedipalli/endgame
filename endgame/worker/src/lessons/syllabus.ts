@@ -1,4 +1,4 @@
-import { carryProgress, flattenSyllabus, type Course, type CourseId } from '../../../app/src/lib/course.ts';
+import { carryProgress, flattenSyllabus, type Course, type CourseId } from '../../../shared/course.ts';
 import { writeChessSyllabus } from '../chess/course.ts';
 import { ask } from '../claude.ts';
 import { loadCourse, saveCourse, type Db } from '../db.ts';

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { checkBlock } from '../../../app/src/lib/blocks.ts';
+import { checkBlock } from '../../../shared/blocks.ts';
 import { findMistakes, phaseOf, severity, winChance } from '../chess/analyze.ts';
 import { openingName, toRow } from '../chess/chesscom.ts';
 import { deviations, interleave, namesMatchLine, notationTopics, resolveBoards, reviewTopic } from '../chess/course.ts';

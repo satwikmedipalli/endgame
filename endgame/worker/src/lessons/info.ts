@@ -1,4 +1,4 @@
-import type { CourseId } from '../../../app/src/lib/course.ts';
+import type { CourseId } from '../../../shared/course.ts';
 
 // What each course is for. Used once to write the syllabus and with every lesson.
 export const COURSES: Record<CourseId, { name: string; goal: string; path: string; size: string; minutes: [number, number]; style: string }> = {
