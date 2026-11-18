@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import type { ThemePref } from '@shared/sun';
-import type { HelperState } from '../../api';
+import type { HelperState, UpdateState } from '../../api';
 import { config, supabase } from '../lib';
 import { useAuth } from '../store/Auth';
 import { useFeed } from '../store/Feed';
@@ -16,6 +16,59 @@ export function useHelperState() {
     return window.endgame.onHelperState(setS);
   }, []);
   return s;
+}
+
+export function useUpdate() {
+  const [s, setS] = useState<UpdateState | null>(null);
+  useEffect(() => {
+    window.endgame.updateState().then(setS);
+    return window.endgame.onUpdateState(setS);
+  }, []);
+  return s;
+}
+
+function Updates() {
+  const u = useUpdate();
+  const cur = u?.current;
+  const line =
+    u?.status === 'checking'
+      ? 'Checking GitHub…'
+      : u?.status === 'downloading'
+        ? `Downloading build ${u.remote}…`
+        : u?.status === 'ready'
+          ? `Build ${u.remote} is ready${u.message ? `: ${u.message}` : ''}. Restart to use it.`
+          : u?.status === 'current'
+            ? 'You’re on the latest build.'
+            : u?.status === 'needs-rebuild'
+              ? `Build ${u.remote} changes the app itself. Run npm run install-app in ~/endgame/endgame once.`
+              : u?.status === 'error'
+                ? `Couldn’t check: ${u.error}`
+                : 'Endgame checks GitHub when it opens and every 3 hours.';
+  return (
+    <section className="panel">
+      <div className="row between">
+        <h3 className="panel-title">Updates</h3>
+        <span className="muted small tabular">
+          {cur ? `Build ${cur.version}${cur.commit ? ` · ${cur.commit.slice(0, 7)}` : ''}` : ''}
+        </span>
+      </div>
+      <p className="small">{line}</p>
+      <div className="row gap-s">
+        {u?.status === 'ready' ? (
+          <button type="button" className="btn btn-done" onClick={() => window.endgame.restartToUpdate()}>
+            Restart to update
+          </button>
+        ) : (
+          <button type="button" className="btn" disabled={u?.status === 'checking' || u?.status === 'downloading'} onClick={() => window.endgame.checkForUpdate()}>
+            Check for updates
+          </button>
+        )}
+      </div>
+      <p className="faint small">
+        New builds come from GitHub (the app-build branch, built automatically on every push). Your days, settings and login are never touched.
+      </p>
+    </section>
+  );
 }
 
 export function Settings({ onEditSetup }: { onEditSetup: () => void }) {
@@ -56,6 +109,8 @@ export function Settings({ onEditSetup }: { onEditSetup: () => void }) {
   return (
     <div className="stack">
       <h1 className="sheet-title">Settings</h1>
+
+      <Updates />
 
       <section className="panel">
         <h3 className="panel-title">Theme</h3>

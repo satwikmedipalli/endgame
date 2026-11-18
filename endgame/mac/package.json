@@ -5,7 +5,7 @@
   "description": "A daily feed that actually ends.",
   "author": "Satwik Medipalli",
   "private": true,
-  "main": "dist/main.cjs",
+  "main": "dist/boot.cjs",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "vite build && node scripts/build-main.mjs",
@@ -65,5 +65,9 @@
         "NSHumanReadableCopyright": "A daily feed that actually ends."
       }
     }
+  },
+  "endgame": {
+    "shell": 1,
+    "updates": "satwikmedipalli/endgame, branch app-build (see src/main/updater.ts)"
   }
 }

@@ -1,0 +1,57 @@
+# Builds the Mac app's code on every push to main and publishes it to the `app-build`
+# branch. Endgame checks that branch when it opens, every 3 hours and from its Update
+# button, and downloads newer builds by itself (endgame/mac/src/main/updater.ts).
+name: App build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'endgame/mac/**'
+      - 'endgame/shared/**'
+      - 'endgame/worker/src/**'
+      - 'endgame/package-lock.json'
+      - '.github/workflows/app-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: endgame
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the build number is the commit count
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: endgame/package-lock.json
+      # Only the code is built here; the Electron binary itself isn't needed.
+      - run: npm ci -w mac
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run build -w mac
+      - name: Publish to the app-build branch
+        run: |
+          set -e
+          out=$(mktemp -d)
+          cd mac/dist
+          cp -R main.cjs main.cjs.map preload.cjs version.json renderer "$out"/
+          cat version.json
+          cd "$out"
+          git init -q -b app-build
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Build $(node -p 'require("./version.json").version') from ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" app-build

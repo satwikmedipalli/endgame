@@ -219,6 +219,10 @@ kbd {
 .link:hover {
   text-decoration-color: var(--ink);
 }
+.link.hot {
+  color: var(--hot);
+  font-weight: 600;
+}
 .icon-btn {
   width: 34px;
   height: 34px;

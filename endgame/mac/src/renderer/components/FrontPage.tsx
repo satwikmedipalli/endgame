@@ -6,6 +6,7 @@ import { supabase } from '../lib';
 import { useFeed } from '../store/Feed';
 import { useHelper } from '../store/Helper';
 import { KIND_LABEL, useTheme } from '../theme';
+import { useUpdate } from './Settings';
 import { SyncButton, useSyncLabel } from './Sync';
 
 type Props = { feed: DayFeed; onOpen: (id: string) => void; onNav: (view: 'progress' | 'settings') => void };
@@ -86,6 +87,7 @@ export function FrontPage({ feed, onOpen, onNav }: Props) {
   const { clearNews } = useFeed();
   const { online } = useHelper();
   const sync = useSyncLabel();
+  const update = useUpdate();
   const p = progress(feed);
   const unbuilt = !!supabase && feed.source !== 'sync';
 
@@ -117,6 +119,11 @@ export function FrontPage({ feed, onOpen, onNav }: Props) {
         <nav className="fp-nav">
           <span className={`dot${online ? ' on' : ''}`} title={online ? 'Helper running' : 'Helper offline'} />
           <span className="faint small">{sync.running ? sync.text : online ? 'Helper ready' : 'Helper offline'}</span>
+          {update?.status === 'ready' && (
+            <button type="button" className="link hot" onClick={() => window.endgame.restartToUpdate()}>
+              Update ready · Restart
+            </button>
+          )}
           <button type="button" className="link" onClick={() => onNav('progress')}>
             Progress
           </button>

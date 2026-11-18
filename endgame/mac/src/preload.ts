@@ -1,7 +1,7 @@
 // Exposes a small, fixed API to the window. The page never gets Node or Electron itself.
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { Command, EndgameApi, EndgameConfig, HelperState } from './api';
+import type { Command, EndgameApi, EndgameConfig, HelperState, UpdateState } from './api';
 
 const api: EndgameApi = {
   getConfig: () => ipcRenderer.invoke('config:get'),
@@ -24,6 +24,14 @@ const api: EndgameApi = {
     ipcRenderer.on('command', fn);
     return () => ipcRenderer.off('command', fn);
   },
+  updateState: () => ipcRenderer.invoke('update:state'),
+  checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  onUpdateState: (cb) => {
+    const fn = (_: unknown, s: UpdateState) => cb(s);
+    ipcRenderer.on('update:state', fn);
+    return () => ipcRenderer.off('update:state', fn);
+  },
+  restartToUpdate: () => ipcRenderer.send('update:restart'),
   getLoginItem: () => ipcRenderer.invoke('login-item:get'),
   setLoginItem: (on) => ipcRenderer.send('login-item:set', on),
 };

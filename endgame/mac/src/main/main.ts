@@ -1,6 +1,6 @@
 // Endgame for Mac: the window, the menu bar item, and the helper that used to run as a
 // separate launchd service (Sync, lessons, chat replies through `claude -p`).
-import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeImage, nativeTheme, shell, Tray, type MenuItemConstructorOptions } from 'electron';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -8,10 +8,12 @@ import { startHelper, type Helper } from '../../../worker/src/helper.ts';
 import type { Command, EndgameConfig, HelperState } from '../api';
 import { Config } from './config';
 import { findClaude, fixPath } from './shellPath';
+import { checkForUpdate, onUpdateState, running, updateState } from './updater';
 
 const DEV_URL = process.env.VITE_DEV_URL;
-const ROOT = app.getAppPath();
-const asset = (name: string) => join(ROOT, 'assets', name);
+// This bundle's own folder: inside Endgame.app, or the downloaded update (see boot.ts).
+const DIST = __dirname;
+const asset = (name: string) => join(app.getAppPath(), 'assets', name);
 const BG = { light: '#E8E8E3', dark: '#121212' } as const;
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -83,7 +85,7 @@ function createWindow() {
     trafficLightPosition: { x: 20, y: 20 },
     backgroundColor: BG[mode],
     show: false,
-    webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, spellcheck: true },
+    webPreferences: { preload: join(DIST, 'preload.cjs'), contextIsolation: true, sandbox: true, spellcheck: true },
   });
   win.once('ready-to-show', () => win?.show());
   // Links open in your browser, never inside the app.
@@ -103,7 +105,7 @@ function createWindow() {
     win?.hide();
   });
   if (DEV_URL) win.loadURL(DEV_URL);
-  else win.loadFile(join(ROOT, 'dist/renderer/index.html'));
+  else win.loadFile(join(DIST, 'renderer/index.html'));
 }
 
 function show(cmd?: Command) {
@@ -126,9 +128,17 @@ function updateTray() {
         : helperState.state === 'error'
           ? 'Helper offline, retrying'
           : 'Helper not set up';
+  const up = updateState();
+  const updateItem: MenuItemConstructorOptions =
+    up.status === 'ready'
+      ? { label: `Restart to update (build ${up.remote})`, click: restartToUpdate }
+      : up.status === 'checking' || up.status === 'downloading'
+        ? { label: up.status === 'checking' ? 'Checking for updates…' : 'Downloading update…', enabled: false }
+        : { label: 'Check for updates', click: () => update(true) };
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Open Endgame', click: () => show('front') },
+      updateItem,
       { label: 'Sync now', enabled: !!helper, click: () => helper?.requestSync().catch((e) => log(`sync request failed: ${e.message}`)) },
       { type: 'separator' },
       { label: helperLine, enabled: false },
@@ -153,6 +163,7 @@ function appMenu() {
         label: 'Endgame',
         submenu: [
           { role: 'about' },
+          { label: 'Check for updates…', click: () => update(true).then(() => show('settings')) },
           { type: 'separator' },
           { label: 'Settings…', accelerator: 'Cmd+,', click: () => show('settings') },
           { type: 'separator' },
@@ -176,6 +187,22 @@ function appMenu() {
       { role: 'windowMenu' },
     ]),
   );
+}
+
+// ---------- updates ----------
+onUpdateState((s) => {
+  win?.webContents.send('update:state', { ...s, current: running() });
+  updateTray();
+});
+async function update(manual: boolean) {
+  const s = await checkForUpdate(log);
+  if (manual && s.status === 'ready') show();
+  return s;
+}
+function restartToUpdate() {
+  quitting = true;
+  app.relaunch();
+  app.exit(0);
 }
 
 // ---------- IPC ----------
@@ -204,6 +231,9 @@ ipcMain.on('open-external', (_e, url: string) => {
 });
 ipcMain.on('copy', (_e, text: string) => clipboard.writeText(text));
 ipcMain.on('quit', () => app.quit());
+ipcMain.handle('update:state', () => updateState());
+ipcMain.handle('update:check', () => update(true));
+ipcMain.on('update:restart', () => restartToUpdate());
 ipcMain.handle('login-item:get', () => app.getLoginItemSettings().openAtLogin);
 ipcMain.on('login-item:set', (_e, on: boolean) => {
   app.setLoginItemSettings({ openAtLogin: on });
@@ -218,14 +248,20 @@ app.on('before-quit', () => {
 });
 
 app.whenReady().then(() => {
-  app.setAboutPanelOptions({ applicationName: 'Endgame', credits: 'A daily feed that actually ends.' });
+  const me = running();
+  app.setAboutPanelOptions({ applicationName: 'Endgame', applicationVersion: `build ${me.version}`, version: me.commit.slice(0, 7), credits: 'A daily feed that actually ends.' });
   appMenu();
   tray = new Tray(nativeImage.createEmpty());
   updateTray();
   setDockIcon();
   createWindow();
-  log(`Endgame ${app.getVersion()} started; claude: ${findClaude() ?? 'not found'}`);
+  log(`Endgame build ${me.version} (${me.commit.slice(0, 7) || 'local'}, ${me.source}) started; claude: ${findClaude() ?? 'not found'}`);
   runHelper();
+  // Like Wellness: look for a newer build shortly after opening, then every 3 hours.
+  if (!DEV_URL) {
+    setTimeout(() => update(false), 8_000);
+    setInterval(() => update(false), 3 * 60 * 60 * 1000);
+  }
   // Keep the menu bar line about the helper current.
   setInterval(updateTray, 15_000);
 });
