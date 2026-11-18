@@ -33,7 +33,8 @@ npm test
 npm run typecheck
 
 step "5/6  Supabase: adding the puzzle card kind"
-npx supabase db push || echo "Skipped. Run 'npx supabase db push' in ~/endgame/endgame later (puzzles need it)."
+# --remote: your linked project on supabase.com, not a local Docker database.
+npx supabase db push --remote || echo "Skipped. Run 'npx supabase db push --remote' in ~/endgame/endgame later (puzzles need it)."
 
 step "6/6  Building Endgame.app into /Applications"
 npm run install-app

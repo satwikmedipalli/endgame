@@ -94,13 +94,13 @@ The connector: `cd supabase/functions/mcp && deno test -A` (fake database, never
    ```bash
    npx supabase login                                  # opens the browser
    npx supabase link --project-ref <your-project-ref>  # asks for the database password
-   npx supabase db push                                # creates the tables + row-level security
+   npx supabase db push --remote                       # creates the tables + row-level security
    npx supabase config push                            # password login, no confirmation emails
    ```
 3. Signups are off in `supabase/config.toml`, and the `single_user` migration blocks any second account at the database level. To create the account on a fresh project, temporarily set `enable_signup = true`, push, sign up once (for example from the Supabase dashboard → Authentication → Add user), then set it back.
 4. Open Endgame and fill in the setup screen.
 
-After pulling a change that adds a migration (the puzzles one, `20261117000001_puzzles.sql`, adds the `puzzle` card kind), run `npx supabase db push` again.
+After pulling a change that adds a migration (the puzzles one, `20261117000001_puzzles.sql`, adds the `puzzle` card kind), run `npx supabase db push --remote` again.
 
 The free project pauses after 7 days without use; restore it from the dashboard with one click.
 
