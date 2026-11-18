@@ -173,6 +173,8 @@ function Front({ page, pages, feed, onOpen, onTurn }: { page: Extract<PaperPage,
         <aside className="inside">
           <h2>Inside today</h2>
           {pages.slice(1).map((pg, k) => {
+            // A section is listed once, at its first page.
+            if ((pg.kind === 'section' && pg.part > 1) || (pg.kind === 'back' && pg.title !== 'Back page')) return null;
             const left = cardsOf(pg).filter((c) => c.status === 'open').length;
             const label = pg.kind === 'break' || pg.kind === 'back' ? cardsOf(pg).map((c) => c.title).join(', ') : pg.title;
             return (
