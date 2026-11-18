@@ -16,7 +16,8 @@ Personal, single-user Mac app. No ads, no infinite scroll, no paid API: all AI w
 | 6 | Chess (chess.js, Chess.com games, Stockfish Action) | ✅ |
 | 7 | Italian (spaced repetition, pronunciation) | ✅ |
 | 8 | "Discuss in Claude" connector | ✅ |
-| 9 | Mac app: Newsprint front page, paper sheets, helper inside the app, sudoku + mini crossword | ✅ (the iPhone app is retired) |
+| 9 | Mac app: helper inside the app, paper sheets, sudoku + mini crossword, self-update | ✅ (the iPhone app is retired) |
+| 10 | Paged newspaper: sections you swipe through, breaks with lessons and puzzles; Salmon and Sepia themes | ✅ |
 
 ## Folders
 
@@ -24,11 +25,12 @@ Personal, single-user Mac app. No ads, no infinite scroll, no paid API: all AI w
 mac/       The Mac app (Electron)
   src/main/        main process: window, menu bar item, Dock icon, settings, runs the helper
   src/preload.ts   the small API the window gets
-  src/renderer/    the window (React): front page, paper sheets, lessons, puzzles, progress, settings
+  src/renderer/    the window (React): the paged newspaper, paper sheets, lessons, puzzles, progress, settings
   assets/          day and night Dock icons
   build/           app icon (and the script that drew it)
 shared/    pure logic + tests, used by the app, the helper and the connector
-           (feed rules, sync/merge, sun/theme, lesson blocks, spaced repetition, sudoku, crossword)
+           (feed rules, the paper's pages and sections, sync/merge, sun/theme, lesson blocks,
+           spaced repetition, sudoku, crossword)
 worker/    the helper: Sync (news pipeline), lessons, chat replies, via `claude -p`
 supabase/  database migrations, auth config, the MCP connector
 design/    the original design canvas files, for reference
@@ -67,8 +69,9 @@ Open Endgame from Spotlight or Launchpad. On first launch it reads your old help
 
 | Where | Key | Does |
 |---|---|---|
-| Front page | Click, or Return | Open a story (Return opens the first one still open) |
-| Paper | ← → or `[` `]`, two-finger swipe | Turn the page |
+| Newspaper | → ← , two-finger swipe, the edge arrows or the section tabs | Turn the page |
+| Newspaper | Click, or Return | Open a story (Return opens the first one still open on the page) |
+| Paper | ← → or `[` `]` | Next / previous story |
 | Paper | D / S / U | Done / Skip / Undo |
 | Paper | ⌘K | Ask about this card |
 | Paper | Esc | Put the paper away |

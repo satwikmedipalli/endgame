@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { nextOpenIndex } from '@shared/feed';
-import type { Card, DayFeed } from '@shared/types';
+import type { Card } from '@shared/types';
 import { typing } from '../lib';
 import { useFeed } from '../store/Feed';
 import { KIND_LABEL } from '../theme';
 import { CardBody } from './CardBody';
 import { Icon } from './Icon';
 
-type Props = { feed: DayFeed; openId: string | null; onOpen: (id: string) => void; onClose: () => void };
+/** `cards` are in reading order (the paper's page order), so Next follows the paper. */
+type Props = { cards: Card[]; openId: string | null; onOpen: (id: string) => void; onClose: () => void };
 
 /** The keyboard belongs to a puzzle grid while it has focus. */
 const puzzleHasKeys = (e: KeyboardEvent) => !!(e.target as HTMLElement | null)?.closest?.('[data-keys]');
@@ -18,9 +18,8 @@ const puzzleHasKeys = (e: KeyboardEvent) => !!(e.target as HTMLElement | null)?.
  * a two-finger swipe, or Previous / Next), the next pages wait stacked underneath, and
  * closing drops the paper away.
  */
-export function Reader({ feed, openId, onOpen, onClose }: Props) {
+export function Reader({ cards, openId, onOpen, onClose }: Props) {
   const { mark, undo, opened } = useFeed();
-  const cards = feed.cards;
   const page = openId ? cards.findIndex((c) => c.id === openId) : -1;
   const isOpen = page >= 0;
   // While closing, keep drawing the last page so it can slide away.
@@ -40,12 +39,16 @@ export function Reader({ feed, openId, onOpen, onClose }: Props) {
   const finish = useCallback(
     (c: Card, status: 'done' | 'skip') => {
       mark(c.id, status);
-      // Next open card after this one; none left means the day is over and the paper goes.
-      const after = { ...feed, cards: cards.map((x) => (x.id === c.id ? { ...x, status } : x)) };
-      const nxt = nextOpenIndex(after, cards.indexOf(c));
+      // Next open card after this one in the paper; none left means the day is over.
+      const from = cards.indexOf(c);
+      let nxt = -1;
+      for (let k = 1; k < cards.length && nxt < 0; k++) {
+        const i = (from + k) % cards.length;
+        if (cards[i].status === 'open' && cards[i].id !== c.id) nxt = i;
+      }
       setTimeout(() => (nxt >= 0 ? go(nxt) : onClose()), 160);
     },
-    [mark, feed, cards, go, onClose],
+    [mark, cards, go, onClose],
   );
 
   // Keyboard: ← → turn, D done, S skip, U undo, Esc closes.

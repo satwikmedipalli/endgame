@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { progress } from '@shared/feed';
+import { buildPaper, pageOf, readingOrder } from '@shared/paper';
 import { Done } from './components/Done';
-import { FrontPage } from './components/FrontPage';
+import { Newspaper } from './components/Newspaper';
 import { Paper } from './components/Paper';
 import { Progress } from './components/Progress';
 import { Reader } from './components/Reader';
@@ -23,6 +24,11 @@ function Shell() {
   const [view, setView] = useState<View>('front');
   const [lookBack, setLookBack] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  const [page, setPage] = useState(0);
+  const pages = useMemo(() => buildPaper(today?.cards ?? []), [today?.cards]);
+  const order = useMemo(() => readingOrder(pages), [pages]);
+  const lastOpen = useRef<string | null>(null);
+  if (openId) lastOpen.current = openId;
 
   const stats = today ? progress(today) : null;
   // Signed in, a day Sync hasn't built yet only has carry-overs; it isn't "done".
@@ -51,40 +57,52 @@ function Shell() {
         } else {
           setOpenId(null);
           setView('front');
+          setPage(0);
         }
       }),
     [requestSync],
   );
 
-  // On the front page, Return opens the first open card.
+  // Return opens the first story still open on the page you're looking at.
   useEffect(() => {
     if (openId || view !== 'front' || !today) return;
     const onKey = (e: KeyboardEvent) => {
       if (typing(e) || e.metaKey) return;
       if (e.key === 'Enter' && document.activeElement === document.body) {
-        const first = today.cards.find((c) => c.status === 'open') ?? today.cards[0];
+        const here = order.filter((c) => pageOf(pages, c.id) === page);
+        const first = here.find((c) => c.status === 'open') ?? here[0];
         if (first) setOpenId(first.id);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [openId, view, today]);
+  }, [openId, view, today, order, pages, page]);
 
-  const close = useCallback(() => setOpenId(null), []);
+  // Putting the paper away returns you to the page of the last story you read.
+  const close = useCallback(() => {
+    setOpenId(null);
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    const i = lastOpen.current ? pageOf(pages, lastOpen.current) : -1;
+    if (i >= 0) setPage(i);
+  }, [pages]);
   if (!ready || !today) return <div className="front" />;
 
   if (view === 'setup') return <Setup onCancel={() => setView('settings')} />;
   return (
     <>
-      <FrontPage
+      <Newspaper
         feed={today}
+        pages={pages}
+        at={page}
+        onTurn={setPage}
         onOpen={(id) => {
           setLookBack(false);
           setOpenId(id);
         }}
         onNav={setView}
+        active={!openId && view === 'front'}
       />
-      <Reader feed={today} openId={openId} onOpen={setOpenId} onClose={close} />
+      <Reader cards={order} openId={openId} onOpen={setOpenId} onClose={close} />
       {view === 'progress' && (
         <Paper title="Progress" onClose={() => setView('front')}>
           <Progress />

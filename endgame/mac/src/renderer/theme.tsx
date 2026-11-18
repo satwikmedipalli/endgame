@@ -1,4 +1,4 @@
-// Newsprint, day and night: light from sunrise to sunset in Richardson, dark after.
+// The paper's two themes: Salmon from sunrise to sunset in Richardson, Sepia after.
 // Colours live in styles.css as CSS variables; this only decides which set is on.
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
