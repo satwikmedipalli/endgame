@@ -41,9 +41,17 @@ It's one npm workspace (`shared`, `worker`, `mac`), so a single `npm install` at
 
 You need Node 22+ and Claude Code (`claude`) signed in on this Mac.
 
+First time on this Mac (stops the old launchd helper, switches git to the Command Line Tools, offers to delete Xcode, installs, tests, pushes the puzzles migration, builds and installs):
+
+```bash
+zsh ~/endgame/endgame/mac/scripts/setup-mac.sh
+```
+
+After that, to update:
+
 ```bash
 cd ~/endgame/endgame
-npm install                # first time, and after pulling changes
+git pull && npm install    # after pulling changes
 npm run install-app        # builds Endgame.app and copies it to /Applications
 ```
 
