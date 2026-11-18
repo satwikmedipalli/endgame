@@ -269,7 +269,6 @@ export function Newspaper({ feed, pages, at, onTurn, onOpen, onNav, active }: Pr
 
   return (
     <div className="paper" onWheel={onWheel}>
-      <TopNav onNav={onNav} />
       <div className="track" style={{ transform: `translateX(${-page * 100}%)` }}>
         {pages.map((p, i) => (
           <section key={p.id} className={`page page-${p.kind}`} aria-label={p.title} inert={i !== page}>
@@ -299,6 +298,9 @@ export function Newspaper({ feed, pages, at, onTurn, onOpen, onNav, active }: Pr
           </section>
         ))}
       </div>
+      {/* Last in the page on purpose: the window works out its drag areas in page order and the
+          last one wins, so the nav must come after the mastheads to stay clickable. */}
+      <TopNav onNav={onNav} />
 
       {prev && (
         <button type="button" className="edge left" aria-label={`Previous page: ${prev.title}`} onClick={() => go(page - 1)}>
