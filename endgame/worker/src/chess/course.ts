@@ -226,7 +226,7 @@ export async function cloudEval(fen: string): Promise<CloudEval> {
   try {
     const res = await fetch(`https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}`, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return null;
-    const d = await res.json();
+    const d = (await res.json()) as { depth: number; pvs?: { moves: string; cp?: number; mate?: number }[] };
     const pv = d.pvs?.[0];
     if (!pv) return null;
     const g = new Chess(fen);
