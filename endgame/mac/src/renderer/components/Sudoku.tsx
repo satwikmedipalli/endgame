@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 
 import { conflicts } from '@shared/sudoku';
 import type { Block } from '@shared/types';
@@ -20,12 +20,25 @@ export function Sudoku({ b, cardId }: { b: B; cardId?: string }) {
   const left = [...cells].filter((c) => c === '0').length;
   const solved = cells === b.solution;
 
-  const save = (next: string, check = false) => cardId && patch(cardId, { puzzle: { entries: next, checked: check } });
-  const put = (v: string) => {
-    if (sel < 0 || b.givens[sel] !== '0') return;
-    save(entries.slice(0, sel) + v + entries.slice(sel + 1));
+  // Keys read and write the latest values through this ref (fast typing outruns re-renders).
+  const live = useRef({ entries, sel });
+  live.current.entries = entries;
+  live.current.sel = sel;
+  const save = (next: string, check = false) => {
+    live.current.entries = next;
+    if (cardId) patch(cardId, { puzzle: { entries: next, checked: check } });
   };
-  const move = (dr: number, dc: number) => setSel((i) => ((Math.floor(i / 9) + dr + 9) % 9) * 9 + ((i % 9) + dc + 9) % 9);
+  const put = (v: string) => {
+    const { entries: cur, sel: at } = live.current;
+    if (at < 0 || b.givens[at] !== '0') return;
+    save(cur.slice(0, at) + v + cur.slice(at + 1));
+  };
+  const move = (dr: number, dc: number) => {
+    const i = live.current.sel;
+    const next = ((Math.floor(i / 9) + dr + 9) % 9) * 9 + ((i % 9) + dc + 9) % 9;
+    live.current.sel = next;
+    setSel(next);
+  };
 
   const onKey = (e: KeyboardEvent) => {
     if (/^[1-9]$/.test(e.key)) put(e.key);
@@ -59,7 +72,10 @@ export function Sudoku({ b, cardId }: { b: B; cardId?: string }) {
               tabIndex={-1}
               className={cls.filter(Boolean).join(' ')}
               aria-label={`Row ${r + 1}, column ${c + 1}: ${v === '0' ? 'empty' : v}${given ? ', given' : ''}`}
-              onClick={() => setSel(i)}
+              onClick={() => {
+                live.current.sel = i;
+                setSel(i);
+              }}
             >
               {v === '0' ? '' : v}
             </button>

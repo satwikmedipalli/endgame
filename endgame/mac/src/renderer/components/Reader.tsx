@@ -53,11 +53,15 @@ export function Reader({ feed, openId, onOpen, onClose }: Props) {
     if (!isOpen) return;
     const c = cards[page];
     const onKey = (e: KeyboardEvent) => {
-      if (typing(e) || puzzleHasKeys(e) || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key;
+      // Esc always puts the paper away, even from inside a puzzle grid.
+      if (k === 'Escape' && !typing(e)) {
+        e.preventDefault();
+        return onClose();
+      }
+      if (typing(e) || puzzleHasKeys(e) || e.metaKey || e.ctrlKey || e.altKey) return;
       if (k === 'ArrowRight' || k === ']') go(page + 1);
       else if (k === 'ArrowLeft' || k === '[') go(page - 1);
-      else if (k === 'Escape') onClose();
       else if ((k === 'd' || k === 'D') && c.status === 'open') finish(c, 'done');
       else if ((k === 's' || k === 'S') && c.status === 'open') finish(c, 'skip');
       else if ((k === 'u' || k === 'U') && c.status !== 'open') undo(c.id);

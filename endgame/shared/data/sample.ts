@@ -1,4 +1,6 @@
 // Dummy content for milestone 1. Sync replaces all of this from milestone 3 on.
+import { numberGrid } from '../crossword';
+import { levelFor, makeSudoku } from '../sudoku';
 import type { Block, Card, DayFeed } from '../types';
 import demoNews from './demo-news.json';
 
@@ -111,6 +113,26 @@ const watchPitch: Block[] = [
   { type: 'callout', label: 'Why you might like it', text: 'Quiet, thoughtful science fiction where the puzzle is understanding, not fighting.' },
 ];
 
+/** A sample sudoku (made in code, like the real one) and a hand-clued mini crossword. */
+const CLUES: Record<string, string> = {
+  SLAB: 'Thick, flat piece of stone',
+  HOME: 'Where the heart is',
+  OVEN: 'Pizza ___',
+  TEND: 'Look after, as a garden',
+  SHOT: 'Espresso serving',
+  LOVE: 'Zero, in tennis',
+  AMEN: 'Last word of a prayer',
+  BEND: 'Curve, as a river does',
+};
+function puzzleCards(day: string): Card[] {
+  const s = makeSudoku(day, levelFor(day));
+  const grid = 'SLABHOMEOVENTEND';
+  return [
+    card({ id: `puzzle-sudoku-${day}`, kind: 'puzzle', title: 'Sudoku', hook: `${s.level} · ${[...s.givens].filter((c) => c === '0').length} squares to fill.`, tag: `Sudoku · ${s.level}`, cta: 'Play', blocks: [{ type: 'sudoku', givens: s.givens, solution: s.solution, level: s.level }] }),
+    card({ id: `puzzle-crossword-${day}`, kind: 'puzzle', title: 'Mini crossword', hook: '4 across, 4 down.', tag: 'Crossword · 4×4', cta: 'Play', blocks: [{ type: 'crossword', size: 4, grid, clues: numberGrid(4, grid).map((e) => ({ ...e, clue: CLUES[e.answer] })) }] }),
+  ];
+}
+
 /** Card ids are content identities, so news ids include the day (lessons repeat their id when carried). */
 export function freshCards(day: string): Card[] {
   return [
@@ -176,6 +198,7 @@ export function freshCards(day: string): Card[] {
       blocks: watchPitch,
       watch: { stage: 'teaser' },
     }),
+    ...puzzleCards(day),
   ];
 }
 

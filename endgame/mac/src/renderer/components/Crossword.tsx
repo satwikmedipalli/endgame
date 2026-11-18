@@ -35,8 +35,23 @@ export function Crossword({ b, cardId }: { b: B; cardId?: string }) {
   const filled = [...entries].filter((ch) => /[A-Z]/.test(ch)).length;
   const total = [...b.grid].filter((ch) => ch !== '#').length;
 
-  const save = (next: string, check = false) => cardId && patch(cardId, { puzzle: { entries: next, checked: check } });
-  const setAt = (i: number, v: string) => save(entries.slice(0, i) + v + entries.slice(i + 1));
+  // Fast typing can deliver the next key before React re-renders, so keys read and write
+  // the latest letters and square through this ref rather than the last render's values.
+  const live = useRef({ entries, sel });
+  live.current.entries = entries;
+  live.current.sel = sel;
+  const save = (next: string, check = false) => {
+    live.current.entries = next;
+    if (cardId) patch(cardId, { puzzle: { entries: next, checked: check } });
+  };
+  const setAt = (i: number, v: string) => {
+    const cur = live.current.entries;
+    save(cur.slice(0, i) + v + cur.slice(i + 1));
+  };
+  const goTo = (i: number) => {
+    live.current.sel = i;
+    setSel(i);
+  };
 
   const step = (from: number, d: Dir, by: number) => {
     let i = from;
@@ -54,36 +69,38 @@ export function Crossword({ b, cardId }: { b: B; cardId?: string }) {
     const at = active ? order.indexOf(active) : -1;
     const next = order[(at + (back ? -1 : 1) + order.length) % order.length];
     setDir(next.dir);
-    setSel(next.row * n + next.col);
+    goTo(next.row * n + next.col);
   };
   const pick = (i: number) => {
     if (!open(i)) return;
     if (i === sel) setDir((d) => (d === 'across' ? 'down' : 'across'));
-    setSel(i);
+    goTo(i);
     gridRef.current?.focus();
   };
 
   const onKey = (e: KeyboardEvent) => {
     const k = e.key;
+    const at = live.current.sel;
+    const word = (clueAt(at, activeDir) ?? active) ? cellsOf((clueAt(at, activeDir) ?? active)!) : [];
     if (/^[a-zA-Z]$/.test(k) && !e.metaKey && !e.ctrlKey) {
-      setAt(sel, k.toUpperCase());
-      const nxt = activeCells[activeCells.indexOf(sel) + 1];
-      if (nxt !== undefined) setSel(nxt);
+      setAt(at, k.toUpperCase());
+      const nxt = word[word.indexOf(at) + 1];
+      if (nxt !== undefined) goTo(nxt);
     } else if (k === 'Backspace' || k === 'Delete') {
-      if (/[A-Z]/.test(entries[sel])) setAt(sel, '.');
+      if (/[A-Z]/.test(live.current.entries[at])) setAt(at, '.');
       else {
-        const prev = activeCells[activeCells.indexOf(sel) - 1];
+        const prev = word[word.indexOf(at) - 1];
         if (prev !== undefined) {
           setAt(prev, '.');
-          setSel(prev);
+          goTo(prev);
         }
       }
     } else if (k === 'ArrowRight' || k === 'ArrowLeft') {
-      if (activeDir !== 'across' && clueAt(sel, 'across')) setDir('across');
-      else setSel(step(sel, 'across', k === 'ArrowRight' ? 1 : -1));
+      if (activeDir !== 'across' && clueAt(at, 'across')) setDir('across');
+      else goTo(step(at, 'across', k === 'ArrowRight' ? 1 : -1));
     } else if (k === 'ArrowDown' || k === 'ArrowUp') {
-      if (activeDir !== 'down' && clueAt(sel, 'down')) setDir('down');
-      else setSel(step(sel, 'down', k === 'ArrowDown' ? 1 : -1));
+      if (activeDir !== 'down' && clueAt(at, 'down')) setDir('down');
+      else goTo(step(at, 'down', k === 'ArrowDown' ? 1 : -1));
     } else if (k === ' ') setDir((d) => (d === 'across' ? 'down' : 'across'));
     else if (k === 'Tab') nextClue(e.shiftKey);
     else return;
@@ -103,7 +120,7 @@ export function Crossword({ b, cardId }: { b: B; cardId?: string }) {
             className={`clue${active === c ? ' on' : ''}`}
             onClick={() => {
               setDir(c.dir);
-              setSel(c.row * n + c.col);
+              goTo(c.row * n + c.col);
               gridRef.current?.focus();
             }}
           >
