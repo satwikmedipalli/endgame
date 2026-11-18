@@ -27,6 +27,26 @@ export function useUpdate() {
   return s;
 }
 
+/** Shown on every screen once a new build is downloaded, until you restart or say later. */
+export function UpdateNote() {
+  const u = useUpdate();
+  const [later, setLater] = useState<number | null>(null);
+  if (u?.status !== 'ready' || later === u.remote) return null;
+  return (
+    <div className="update-note" role="status">
+      <span>
+        Build {u.remote} is ready{u.message ? `: ${u.message}` : ''}.
+      </span>
+      <button type="button" className="btn" onClick={() => window.endgame.restartToUpdate()}>
+        Restart now
+      </button>
+      <button type="button" className="later" onClick={() => setLater(u.remote ?? null)}>
+        Later
+      </button>
+    </div>
+  );
+}
+
 function Updates() {
   const u = useUpdate();
   const cur = u?.current;

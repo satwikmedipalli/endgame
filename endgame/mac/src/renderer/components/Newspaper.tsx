@@ -117,7 +117,7 @@ function RunningHead({ page, n, total }: { page: PaperPage; n: number; total: nu
     <header className="running">
       <div className="running-top">
         <span className="running-name">Endgame</span>
-        <span>
+        <span className="running-page">
           Page {n + 1} of {total}
         </span>
       </div>
@@ -129,11 +129,8 @@ function RunningHead({ page, n, total }: { page: PaperPage; n: number; total: nu
   );
 }
 
-function Front({ page, pages, feed, onOpen, onTurn, onNav }: { page: Extract<PaperPage, { kind: 'front' }>; pages: PaperPage[]; feed: DayFeed; onOpen: (id: string) => void; onTurn: (i: number) => void; onNav: Props['onNav'] }) {
+function Front({ page, pages, feed, onOpen, onTurn }: { page: Extract<PaperPage, { kind: 'front' }>; pages: PaperPage[]; feed: DayFeed; onOpen: (id: string) => void; onTurn: (i: number) => void }) {
   const { label } = useTheme();
-  const { online } = useHelper();
-  const sync = useSyncLabel();
-  const update = useUpdate();
   const p = progress(feed);
   const unbuilt = !!supabase && feed.source !== 'sync';
   let date = '';
@@ -143,21 +140,6 @@ function Front({ page, pages, feed, onOpen, onTurn, onNav }: { page: Extract<Pap
   return (
     <>
       <header className="masthead">
-        <nav className="fp-nav">
-          <span className={`dot${online ? ' on' : ''}`} title={online ? 'Helper running' : 'Helper offline'} />
-          <span className="faint small">{sync.running ? sync.text : online ? 'Helper ready' : 'Helper offline'}</span>
-          {update?.status === 'ready' && (
-            <button type="button" className="link hot" onClick={() => window.endgame.restartToUpdate()}>
-              Update ready · Restart
-            </button>
-          )}
-          <button type="button" className="link" onClick={() => onNav('progress')}>
-            Progress
-          </button>
-          <button type="button" className="link" onClick={() => onNav('settings')}>
-            Settings
-          </button>
-        </nav>
         <h1 className="title">Endgame</h1>
         <div className="strip">
           <span>{date}</span>
@@ -191,6 +173,8 @@ function Front({ page, pages, feed, onOpen, onTurn, onNav }: { page: Extract<Pap
         <aside className="inside">
           <h2>Inside today</h2>
           {pages.slice(1).map((pg, k) => {
+            // A section is listed once, at its first page.
+            if ((pg.kind === 'section' && pg.part > 1) || (pg.kind === 'back' && pg.title !== 'Back page')) return null;
             const left = cardsOf(pg).filter((c) => c.status === 'open').length;
             const label = pg.kind === 'break' || pg.kind === 'back' ? cardsOf(pg).map((c) => c.title).join(', ') : pg.title;
             return (
@@ -206,6 +190,30 @@ function Front({ page, pages, feed, onOpen, onTurn, onNav }: { page: Extract<Pap
         </aside>
       </div>
     </>
+  );
+}
+
+/** Helper status, a ready update, Progress and Settings: top right on every page. */
+function TopNav({ onNav }: { onNav: Props['onNav'] }) {
+  const { online } = useHelper();
+  const sync = useSyncLabel();
+  const update = useUpdate();
+  return (
+    <nav className="fp-nav">
+      <span className={`dot${online ? ' on' : ''}`} title={online ? 'Helper running' : 'Helper offline'} />
+      <span className="faint small">{sync.running ? sync.text : online ? 'Helper ready' : 'Helper offline'}</span>
+      {update?.status === 'ready' && (
+        <button type="button" className="link hot" onClick={() => window.endgame.restartToUpdate()}>
+          Update ready · Restart
+        </button>
+      )}
+      <button type="button" className="link" onClick={() => onNav('progress')}>
+        Progress
+      </button>
+      <button type="button" className="link" onClick={() => onNav('settings')}>
+        Settings
+      </button>
+    </nav>
   );
 }
 
@@ -261,12 +269,12 @@ export function Newspaper({ feed, pages, at, onTurn, onOpen, onNav, active }: Pr
 
   return (
     <div className="paper" onWheel={onWheel}>
-      <div className="dragbar" aria-hidden />
+      <TopNav onNav={onNav} />
       <div className="track" style={{ transform: `translateX(${-page * 100}%)` }}>
         {pages.map((p, i) => (
           <section key={p.id} className={`page page-${p.kind}`} aria-label={p.title} inert={i !== page}>
             {p.kind === 'front' ? (
-              <Front page={p} pages={pages} feed={feed} onOpen={onOpen} onTurn={go} onNav={onNav} />
+              <Front page={p} pages={pages} feed={feed} onOpen={onOpen} onTurn={go} />
             ) : (
               <>
                 <RunningHead page={p} n={i} total={pages.length} />
