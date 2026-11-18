@@ -7,7 +7,7 @@ import { Newspaper } from './components/Newspaper';
 import { Paper } from './components/Paper';
 import { Progress } from './components/Progress';
 import { Reader } from './components/Reader';
-import { Settings } from './components/Settings';
+import { Settings, UpdateNote } from './components/Settings';
 import { Setup } from './components/Setup';
 import { config, supabase, typing } from './lib';
 import { AuthProvider, useAuth } from './store/Auth';
@@ -114,6 +114,7 @@ function Shell() {
         </Paper>
       )}
       {finished && showDone && !lookBack && !openId && view === 'front' && <Done feed={today} onLookBack={() => setLookBack(true)} />}
+      <UpdateNote />
     </>
   );
 }
