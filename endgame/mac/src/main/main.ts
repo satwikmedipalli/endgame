@@ -14,7 +14,7 @@ const DEV_URL = process.env.VITE_DEV_URL;
 // This bundle's own folder: inside Endgame.app, or the downloaded update (see boot.ts).
 const DIST = __dirname;
 const asset = (name: string) => join(app.getAppPath(), 'assets', name);
-const BG = { light: '#E8E8E3', dark: '#121212' } as const;
+const BG = { light: '#FCEBDD', dark: '#1C150E' } as const;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
