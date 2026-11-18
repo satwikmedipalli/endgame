@@ -318,8 +318,9 @@ a,
 }
 .fp-nav {
   position: absolute;
-  right: 0;
-  top: 18px;
+  right: 96px;
+  top: 20px;
+  z-index: 7;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -454,7 +455,8 @@ a,
 .running-top {
   -webkit-app-region: drag;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 18px;
   align-items: baseline;
   font-size: 13px;
   color: var(--muted);
