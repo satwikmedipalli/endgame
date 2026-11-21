@@ -8,6 +8,8 @@ Every feed app is built so you never reach the bottom. Endgame is the opposite: 
 
 It's a personal Mac app. All of its AI work runs on my own Claude subscription through Claude Code on the same Mac, so it costs nothing to run.
 
+**Want something like this on your Mac?** Email me at satwik.medipalli@gmail.com.
+
 ## What a day looks like
 
 - **A newspaper you page through**: a front page with the top stories and an "Inside today" index, then sections (Politics & world, Business, Tech & science, Sports, More news). Swipe with two fingers, press → or use the section tabs to turn the page.
